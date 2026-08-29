@@ -6,6 +6,7 @@ SLOT_CROP_COLS <- c(
   "shift_x_px", "shift_y_px",
   "img_w", "img_h", "S0",
   "crop_side_px", "crop_left", "crop_top",
+  "crop_out_px",
   "use_cropped",
   # Source file metadata (original on disk — not the crop)
   "src_w", "src_h", "src_bytes"
@@ -96,6 +97,8 @@ empty_slots_df <- function(slots) {
       df[[cn]] <- 100
     } else if (cn == "rotate_cw") {
       df[[cn]] <- 0
+    } else if (cn == "crop_out_px") {
+      df[[cn]] <- 0
     } else if (cn %in% c("shift_x_pct", "shift_y_pct", "shift_x_px", "shift_y_px")) {
       df[[cn]] <- 0
     } else {
@@ -124,6 +127,8 @@ ensure_slot_columns <- function(df) {
       } else if (cn == "mag_pct") {
         df[[cn]] <- 100
       } else if (cn == "rotate_cw") {
+        df[[cn]] <- 0
+      } else if (cn == "crop_out_px") {
         df[[cn]] <- 0
       } else if (cn %in% c("shift_x_pct", "shift_y_pct", "shift_x_px", "shift_y_px")) {
         df[[cn]] <- 0
@@ -277,6 +282,7 @@ clear_crop_fields <- function(df, i) {
   df$crop_side_px[i] <- NA_real_
   df$crop_left[i] <- NA_real_
   df$crop_top[i] <- NA_real_
+  df$crop_out_px[i] <- 0
   df$use_cropped[i] <- FALSE
   # src_* refreshed by refresh_slot_src_meta after assign
   df$src_w[i] <- NA_real_

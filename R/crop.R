@@ -41,9 +41,18 @@ read_edit_image <- function(src_path, rotate_cw = 0) {
   im
 }
 
-write_cropped_copy <- function(src_path, out_path, b, rotate_cw = 0) {
+write_cropped_copy <- function(src_path, out_path, b, rotate_cw = 0, out_side_px = 0) {
   im <- read_edit_image(src_path, rotate_cw = rotate_cw)
   im <- image_crop(im, crop_geometry(b))
+  # Optional downscale of the square crop only (original source file untouched).
+  side <- suppressWarnings(as.integer(out_side_px))
+  if (!is.na(side) && side > 0L) {
+    info <- image_info(im)
+    cur <- max(info$width[1], info$height[1])
+    if (cur > side) {
+      im <- image_resize(im, sprintf("%dx%d!", side, side))
+    }
+  }
   ext <- tolower(tools::file_ext(out_path))
   if (ext %in% c("jpg", "jpeg")) {
     image_write(im, path = out_path, format = "jpeg", quality = 92)

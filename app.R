@@ -235,6 +235,21 @@ ui <- fluidPage(
               column(6, numericInput("shift_x_pct", "Shift X %", value = 0, step = 0.5)),
               column(6, numericInput("shift_y_pct", "Shift Y %", value = 0, step = 0.5))
             ),
+            selectInput(
+              "crop_out_px",
+              "Saved size (px)",
+              choices = c(
+                "Full (no resize)" = "0",
+                "2400" = "2400",
+                "1600" = "1600",
+                "1200" = "1200",
+                "800" = "800"
+              ),
+              selected = "0",
+              width = "100%"
+            ),
+            div(class = "muted", style = "margin-top:-6px;margin-bottom:8px;",
+                "Only the file in ", tags$code("cropped/"), " is resized. The original stays untouched."),
             actionButton("btn_save_crop", "Save crop", class = "btn-primary", width = "100%"),
             div(class = "muted", style = "margin-top:8px;",
                 "Writes a square crop into ", tags$code("cropped/"), " and remembers settings in ", tags$code("data/"), ".")
@@ -452,6 +467,23 @@ server <- function(input, output, session) {
     rv$rot_cw <- as.integer(rot %% 360)
     updateNumericInput(session, "shift_x_pct", value = p$sx_pct)
     updateNumericInput(session, "shift_y_pct", value = p$sy_pct)
+    out_px <- row$crop_out_px[[1L]]
+    if (is.na(out_px) || out_px <= 0) {
+      updateSelectInput(session, "crop_out_px", selected = "0")
+    } else {
+      presets <- c(
+        "Full (no resize)" = "0",
+        "2400" = "2400",
+        "1600" = "1600",
+        "1200" = "1200",
+        "800" = "800"
+      )
+      sel <- as.character(as.integer(out_px))
+      if (!(sel %in% unname(presets))) {
+        presets <- c(presets, setNames(sel, paste0(sel, " (saved)")))
+      }
+      updateSelectInput(session, "crop_out_px", choices = presets, selected = sel)
+    }
   }
 
   observe({
@@ -638,6 +670,8 @@ server <- function(input, output, session) {
     mag <- if (is.null(input$mag_pct)) 100 else input$mag_pct
     sx_pct <- if (is.null(input$shift_x_pct)) 0 else input$shift_x_pct
     sy_pct <- if (is.null(input$shift_y_pct)) 0 else input$shift_y_pct
+    out_px <- suppressWarnings(as.integer(if (is.null(input$crop_out_px)) 0 else input$crop_out_px))
+    if (is.na(out_px) || out_px < 0L) out_px <- 0L
     shift <- shift_px_from_pct(sx_pct, sy_pct, rv$img_w, rv$img_h)
     b <- crop_bounds(rv$img_w, rv$img_h, rv$S0, mag, shift$sx, shift$sy)
 
@@ -645,7 +679,7 @@ server <- function(input, output, session) {
     out_path <- file.path(cropped_dir(), out_name)
     tryCatch(
       {
-        write_cropped_copy(src, out_path, b, rotate_cw = rv$rot_cw)
+        write_cropped_copy(src, out_path, b, rotate_cw = rv$rot_cw, out_side_px = out_px)
         rv$slots$mag_pct[i] <- mag
         rv$slots$rotate_cw[i] <- rv$rot_cw
         rv$slots$shift_x_pct[i] <- sx_pct
@@ -658,6 +692,7 @@ server <- function(input, output, session) {
         rv$slots$crop_side_px[i] <- b$width
         rv$slots$crop_left[i] <- b$left
         rv$slots$crop_top[i] <- b$top
+        rv$slots$crop_out_px[i] <- out_px
         rv$slots$use_cropped[i] <- TRUE
         meta0 <- read_image_meta(src)
         if (meta0$exists) {
@@ -667,7 +702,8 @@ server <- function(input, output, session) {
         }
         persist_slots()
         rv$grid_nonce <- rv$grid_nonce + 1L
-        showNotification(paste0("Saved crop for ", slot, "."), type = "message")
+        size_note <- if (out_px > 0L) paste0(" at ", out_px, " px") else " (full crop pixels)"
+        showNotification(paste0("Saved crop for ", slot, size_note, "."), type = "message")
       },
       error = function(e) {
         showNotification(paste0("Save crop failed: ", conditionMessage(e)), type = "error", duration = NULL)
