@@ -80,6 +80,16 @@ Poster tab → **Generate poster** → find `output/poster.jpg`.
 **Option B — fine-tune separately**  
 Edit the options at the top of `poster.qmd` (DPI, gap, labels, …), then render it. Output still goes to `output/`. Use this when you want print control without the Shiny UI.
 
+### 5. Setup, year range, and archives
+
+On the **Setup** tab (danger zone):
+
+- **Restore defaults** — back to 19×12 / `0801`–`2612` with fresh demos  
+- **Reshape grid** — change rows/cols, gap, paper, and slot naming. For a **10-year** calendar: start `1501`, end `2412`, leave auto rows/cols on (becomes 10×12), recreate demos  
+- **Archive** — save `data/` (+ optional `cropped/`) under `data/archives/<name>/` without copying `images/`; load later to continue. Keep your photos in `images/`
+
+Reshape and restore **replace** live slot data — archive first if you care about the current project.
+
 ---
 
 ## Folder map

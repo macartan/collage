@@ -28,8 +28,68 @@ PROFILE_DEFAULTS <- list(
   spacing_mm = 1,
   dpi = 300,
   paper = "A1",
-  orientation = "portrait"
+  orientation = "portrait",
+  slot_scheme = "yymm"  # yymm | rowcol | sequential
 )
+
+#' Build slot id vector for a grid.
+#'
+#' @param scheme "yymm" (year-month calendar), "rowcol" (r01c01…), or "sequential" (0001…)
+#' @param rows,cols Grid size; final length is rows * cols
+#' @param start_yymm,end_yymm Used only for scheme "yymm"
+make_slot_ids <- function(scheme = "yymm",
+                          rows = 19L,
+                          cols = 12L,
+                          start_yymm = "0801",
+                          end_yymm = "2612") {
+  rows <- max(1L, as.integer(rows))
+  cols <- max(1L, as.integer(cols))
+  n <- rows * cols
+  scheme <- tolower(as.character(scheme))
+
+  if (identical(scheme, "yymm")) {
+    prefixes <- month_prefixes(start_yymm, end_yymm)
+    if (length(prefixes) < n) {
+      stop(
+        sprintf(
+          "YYMM range %s..%s yields %d slots but grid needs %d (rows×cols). Widen the year/month range or shrink the grid.",
+          start_yymm, end_yymm, length(prefixes), n
+        ),
+        call. = FALSE
+      )
+    }
+    if (length(prefixes) > n) {
+      warning(
+        sprintf(
+          "YYMM range has %d months; using the first %d to fill the %d×%d grid.",
+          length(prefixes), n, rows, cols
+        ),
+        call. = FALSE
+      )
+      prefixes <- prefixes[seq_len(n)]
+    }
+    return(as.character(prefixes))
+  }
+
+  if (identical(scheme, "rowcol")) {
+    ids <- character(n)
+    k <- 1L
+    for (r in seq_len(rows)) {
+      for (c in seq_len(cols)) {
+        ids[k] <- sprintf("r%02dc%02d", r, c)
+        k <- k + 1L
+      }
+    }
+    return(ids)
+  }
+
+  if (identical(scheme, "sequential")) {
+    width <- max(4L, nchar(as.character(n)))
+    return(sprintf(paste0("%0", width, "d"), seq_len(n)))
+  }
+
+  stop("Unknown slot_scheme: ", scheme, " (use yymm, rowcol, or sequential).", call. = FALSE)
+}
 
 #' YYMM prefixes from start to end inclusive (e.g. 0801 .. 2612).
 month_prefixes <- function(start_prefix = "0801", end_prefix = "2612") {
@@ -54,18 +114,31 @@ month_prefixes <- function(start_prefix = "0801", end_prefix = "2612") {
   prefixes[idx >= start_idx & idx <= end_idx]
 }
 
-#' Parse slot id from a filename stem: 1205, 1205_vacation, demos/1205.jpg → "1205".
-slot_from_name <- function(name) {
+#' Parse slot id from a filename stem.
+#' Prefer longest known slot match when `known_slots` provided; else YYMM-style 4 digits,
+#' else full stem before optional _label.
+slot_from_name <- function(name, known_slots = NULL) {
   stem <- tools::file_path_sans_ext(basename(as.character(name)))
+  if (!is.null(known_slots) && length(known_slots) > 0) {
+    known_slots <- as.character(known_slots)
+    # Longest match first so r01c01 beats r01 if both existed
+    ord <- order(nchar(known_slots), decreasing = TRUE)
+    for (s in known_slots[ord]) {
+      if (stem_matches_slot(stem, s)) return(s)
+    }
+  }
   m <- regexpr("^\\d{4}", stem, perl = TRUE)
-  if (m < 1) return(NA_character_)
-  regmatches(stem, m)
+  if (m > 0) return(regmatches(stem, m))
+  # rowcol / freeform: take part before first _label
+  sub("_.*$", "", stem)
 }
 
 #' True if stem is slot or slot_label (1205 or 1205_vacation).
 stem_matches_slot <- function(stem, slot) {
   stem <- tools::file_path_sans_ext(basename(as.character(stem)))
-  grepl(paste0("^", slot, "(_.*)?$"), stem)
+  slot <- as.character(slot)
+  esc <- gsub("([.|()\\[\\]{}+*?^$\\\\])", "\\\\\\1", slot)
+  grepl(paste0("^", esc, "(_.*)?$"), stem)
 }
 
 sanitize_label <- function(label) {
@@ -149,7 +222,13 @@ ensure_slot_columns <- function(df) {
   # Coerce use_cropped
   df$use_cropped <- as.logical(df$use_cropped)
   df$use_cropped[is.na(df$use_cropped)] <- FALSE
-  df$slot <- sprintf("%04d", as.integer(df$slot))
+  df$slot <- as.character(df$slot)
+  # Pad pure YYMM / sequential numeric ids; leave rowcol ids alone
+  num <- suppressWarnings(as.integer(df$slot))
+  if (all(!is.na(num)) && all(grepl("^\\d+$", df$slot))) {
+    width <- max(4L, nchar(as.character(max(num))))
+    df$slot <- sprintf(paste0("%0", width, "d"), num)
+  }
   df
 }
 
@@ -179,13 +258,26 @@ read_profile <- function(path, root = project_root()) {
   out$cols <- as.integer(out$cols)
   out$spacing_mm <- as.numeric(out$spacing_mm)
   out$dpi <- as.integer(out$dpi)
-  out$start_yymm <- sprintf("%04d", as.integer(out$start_yymm))
-  out$end_yymm <- sprintf("%04d", as.integer(out$end_yymm))
+  # YYMM fields may be NA for non-yymm schemes; keep defaults if missing
+  if (!is.null(out$start_yymm) && !is.na(out$start_yymm) && nzchar(as.character(out$start_yymm))) {
+    out$start_yymm <- sprintf("%04d", as.integer(out$start_yymm))
+  } else {
+    out$start_yymm <- PROFILE_DEFAULTS$start_yymm
+  }
+  if (!is.null(out$end_yymm) && !is.na(out$end_yymm) && nzchar(as.character(out$end_yymm))) {
+    out$end_yymm <- sprintf("%04d", as.integer(out$end_yymm))
+  } else {
+    out$end_yymm <- PROFILE_DEFAULTS$end_yymm
+  }
+  if (is.null(out$slot_scheme) || is.na(out$slot_scheme) || !nzchar(as.character(out$slot_scheme))) {
+    out$slot_scheme <- PROFILE_DEFAULTS$slot_scheme
+  } else {
+    out$slot_scheme <- tolower(as.character(out$slot_scheme))
+  }
   out
 }
 
 write_profile <- function(profile, path) {
-  # Store images_dir as given; prefer relative "images" when under project
   row <- data.frame(
     images_dir = as.character(profile$images_dir),
     start_yymm = as.character(profile$start_yymm),
@@ -196,28 +288,32 @@ write_profile <- function(profile, path) {
     dpi = as.integer(profile$dpi),
     paper = as.character(profile$paper),
     orientation = as.character(profile$orientation),
+    slot_scheme = as.character(if (is.null(profile$slot_scheme) || is.na(profile$slot_scheme)) "yymm" else profile$slot_scheme),
     stringsAsFactors = FALSE
   )
   write.csv(row, path, row.names = FALSE)
   invisible(row)
 }
 
-read_slots <- function(path, start_yymm = "0801", end_yymm = "2612") {
-  wanted <- month_prefixes(start_yymm, end_yymm)
+read_slots <- function(path, wanted = NULL, start_yymm = "0801", end_yymm = "2612") {
+  if (is.null(wanted)) {
+    wanted <- month_prefixes(start_yymm, end_yymm)
+  }
+  wanted <- as.character(wanted)
   if (!file.exists(path)) {
     return(empty_slots_df(wanted))
   }
   df <- read.csv(path, stringsAsFactors = FALSE, check.names = FALSE, na.strings = c("NA", ""))
   df <- ensure_slot_columns(df)
   # Ensure all wanted slots exist; keep extras at end
-  have <- df$slot
+  have <- as.character(df$slot)
   missing <- setdiff(wanted, have)
   if (length(missing) > 0) {
     df <- rbind(df, empty_slots_df(missing))
   }
-  # Order by calendar for wanted slots
-  ord <- match(wanted, df$slot)
-  rest <- which(!(df$slot %in% wanted))
+  # Order by calendar / wanted list
+  ord <- match(wanted, as.character(df$slot))
+  rest <- which(!(as.character(df$slot) %in% wanted))
   df <- df[c(ord[!is.na(ord)], rest), , drop = FALSE]
   rownames(df) <- NULL
   df

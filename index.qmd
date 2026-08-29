@@ -1,0 +1,62 @@
+---
+title: "Collage"
+subtitle: "Month-by-month photo posters"
+format:
+  html:
+    theme: flatly
+    toc: false
+    embed-resources: false
+    link-external-newwindow: true
+    title-block-banner: false
+execute:
+  echo: false
+---
+
+**Collage** turns a folder of photos into a print-ready poster: one picture per slot on a calendar-style grid.
+
+It is good for family timelines, project archives, “one photo per month” walls — anything where the story is a grid over time.
+
+![Example collage poster](assets/example.jpg){fig-alt="Example monthly photo collage poster" width=70%}
+
+<p class="caption-note">Example output — your photos, your crops, same idea.</p>
+
+## What you get
+
+- A **Shiny app** (`app.R`) to assign photos to slots, crop them to squares, and generate a poster into `output/`
+- Optional **`poster.qmd`** to fine-tune DPI, gaps, and labels without opening the app
+- Safe **demo tiles** under `images/demos/` so a fresh copy works before you add real photos
+
+## Default grid
+
+The starter layout is **12 months × 19 years** (slots `0801` … `2612` — January 2008 through December 2026), laid out as a **12-column × 19-row** poster on A1 paper.
+
+You can change that in the app’s **Setup** tab (danger zone): rows, columns, gap, paper size, and how slots are named (year–month calendar, row×column ids, or simple `1…n`). Reshape **resets** slot data and can recreate demos for the new cells.
+
+> After editing this file, re-render with Quarto (`quarto render index.qmd`) to refresh `index.html`, or edit `index.html` directly if Quarto is not installed.
+
+## Quick start
+
+1. Install R packages: `shiny`, `magick`, `base64enc`
+2. Open this folder in R / RStudio
+3. If demos are missing: `source("assets/setup.R"); setup_collage(demo = TRUE)`
+4. Run the app: `shiny::runApp(".")`
+5. Put photos in `images/import/` (or pick files in **Edit slot**), crop, then **Generate poster**
+
+Full walkthrough: see [README.md](README.md).
+
+## Two ways to make the poster
+
+| In the app | Fine-tune separately |
+|------------|----------------------|
+| **Poster** tab → Generate poster → `output/poster.jpg` | Prep images in the app, then render `poster.qmd` for print control |
+
+---
+
+<style>
+body { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+h1.title { font-size: 2rem; margin-bottom: 0.15rem; }
+.subtitle { color: #555; margin-top: 0; }
+img { border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.12); max-width: 70%; height: auto; display: block; margin-left: auto; margin-right: auto; }
+.caption-note { color: #777; font-size: 0.9rem; margin-top: -0.5rem; margin-bottom: 1.5rem; text-align: center; }
+table { width: 100%; }
+</style>

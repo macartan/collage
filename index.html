@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Collage — month-by-month photo posters</title>
+  <style>
+    :root {
+      --ink: #1a1a1a;
+      --muted: #5a5a5a;
+      --line: #e4e0d8;
+      --bg: #f7f5f1;
+      --card: #fff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3.5rem;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 0.2rem;
+      letter-spacing: -0.02em;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 1.1rem;
+      margin: 0 0 1.25rem;
+    }
+    h2 {
+      font-size: 1.15rem;
+      margin: 1.75rem 0 0.6rem;
+    }
+    p { margin: 0.55rem 0; }
+    ul, ol { margin: 0.4rem 0 0.8rem; padding-left: 1.25rem; }
+    li { margin: 0.25rem 0; }
+    a { color: #245b8a; }
+    .hero {
+      display: block;
+      width: 70%;
+      max-width: 70%;
+      height: auto;
+      margin: 0 auto;
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.1);
+      background: #ddd;
+    }
+    .cap {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0.5rem 0 1.25rem;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 0.95rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.65rem 0.85rem;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { background: #efece6; font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+    code {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.88em;
+      background: #efece6;
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+    }
+    .note {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-left: 4px solid #356096;
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      margin: 1rem 0;
+    }
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Collage</h1>
+    <p class="sub">Month-by-month photo posters</p>
+
+    <p>
+      <strong>Collage</strong> turns a folder of photos into a print-ready poster:
+      one picture per slot on a calendar-style grid.
+    </p>
+    <p>
+      Good for family timelines, project archives, “one photo per month” walls —
+      anything where the story is a grid over time.
+    </p>
+
+    <img
+      class="hero"
+      src="assets/example.jpg"
+      alt="Example monthly photo collage poster"
+      width="1200"
+      height="800"
+    />
+    <p class="cap">Example output — your photos, your crops, same idea.</p>
+
+    <h2>What you get</h2>
+    <ul>
+      <li>A <strong>Shiny app</strong> (<code>app.R</code>) to assign photos to slots, crop them to squares, and generate a poster into <code>output/</code></li>
+      <li>Optional <code>poster.qmd</code> to fine-tune DPI, gaps, and labels without opening the app</li>
+      <li>Safe <strong>demo tiles</strong> under <code>images/demos/</code> so a fresh copy works before you add real photos</li>
+    </ul>
+
+    <h2>Default grid</h2>
+    <div class="note">
+      The starter layout is <strong>12 months × 19 years</strong>
+      (slots <code>0801</code> … <code>2612</code> — January 2008 through December 2026),
+      shown as a <strong>12-column × 19-row</strong> poster on A1 paper.
+      Change this in the app’s <strong>Setup</strong> tab (danger zone): rows, columns, gap, paper size,
+      and how slots are named (year–month calendar, row×column ids, or simple <code>1…n</code>).
+      Reshape <strong>resets</strong> slot data and can recreate demos for the new cells.
+    </div>
+
+    <h2>Quick start</h2>
+    <ol>
+      <li>Install R packages: <code>shiny</code>, <code>magick</code>, <code>base64enc</code></li>
+      <li>Open this folder in R / RStudio</li>
+      <li>If demos are missing: <code>source("assets/setup.R"); setup_collage(demo = TRUE)</code></li>
+      <li>Run the app: <code>shiny::runApp(".")</code></li>
+      <li>Put photos in <code>images/import/</code> (or pick files in <strong>Edit slot</strong>), crop, then <strong>Generate poster</strong></li>
+    </ol>
+    <p>Full walkthrough: see <a href="README.md">README.md</a>.</p>
+
+    <h2>Two ways to make the poster</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>In the app</th>
+          <th>Fine-tune separately</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Poster</strong> tab → Generate poster → <code>output/poster.jpg</code></td>
+          <td>Prep images in the app, then render <code>poster.qmd</code> for print control</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <footer>
+      Source for this page: <code>index.qmd</code> (re-render with Quarto when you edit it).
+      GitHub Pages can serve this <code>index.html</code> from the repository root.
+    </footer>
+  </main>
+</body>
+</html>

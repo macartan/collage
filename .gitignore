@@ -21,6 +21,10 @@ poster_assets/
 images/import/*
 !images/import/.gitkeep
 
+# Project archives (local snapshots)
+data/archives/*
+!data/archives/.gitkeep
+
 # Keep demos; ignore other user photos at images root
 images/*
 !images/demos/
