@@ -6,7 +6,9 @@ SLOT_CROP_COLS <- c(
   "shift_x_px", "shift_y_px",
   "img_w", "img_h", "S0",
   "crop_side_px", "crop_left", "crop_top",
-  "use_cropped"
+  "use_cropped",
+  # Source file metadata (original on disk — not the crop)
+  "src_w", "src_h", "src_bytes"
 )
 
 SLOT_BAK_COLS <- c(
@@ -276,16 +278,38 @@ clear_crop_fields <- function(df, i) {
   df$crop_left[i] <- NA_real_
   df$crop_top[i] <- NA_real_
   df$use_cropped[i] <- FALSE
+  # src_* refreshed by refresh_slot_src_meta after assign
+  df$src_w[i] <- NA_real_
+  df$src_h[i] <- NA_real_
+  df$src_bytes[i] <- NA_real_
   df
 }
 
-update_slot_source <- function(df, i, new_rel_path, archive = TRUE, reset_crop = TRUE) {
+#' Write original-file dimensions into the slot row (and seed img_* if empty).
+refresh_slot_src_meta <- function(df, i, images_dir) {
+  p <- resolve_image_path(images_dir, df$file_name[i])
+  meta <- read_image_meta(p)
+  df$src_w[i] <- meta$w
+  df$src_h[i] <- meta$h
+  df$src_bytes[i] <- meta$bytes
+  if (is.na(df$img_w[i]) && !is.na(meta$w)) {
+    df$img_w[i] <- meta$w
+    df$img_h[i] <- meta$h
+    df$S0[i] <- min(meta$w, meta$h)
+  }
+  df
+}
+
+update_slot_source <- function(df, i, new_rel_path, archive = TRUE, reset_crop = TRUE, images_dir = NULL) {
   if (isTRUE(archive)) {
     df <- archive_current_to_bak(df, i)
   }
   df$file_name[i] <- new_rel_path
   if (isTRUE(reset_crop)) {
     df <- clear_crop_fields(df, i)
+  }
+  if (!is.null(images_dir)) {
+    df <- refresh_slot_src_meta(df, i, images_dir)
   }
   df
 }

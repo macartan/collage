@@ -76,6 +76,12 @@ ui <- fluidPage(
       .welcome .way { background: #faf9f6; border: 1px solid #e6e3dc; border-radius: 8px; padding: 12px 14px; }
       .welcome .way h4 { margin: 0 0 6px; font-size: 0.95rem; }
       .welcome .way p { margin: 0; font-size: 0.9rem; color: #444; line-height: 1.45; }
+      .meta-box { font-size: 12px; line-height: 1.45; color: #333; background: #faf9f6;
+                  border: 1px solid #e6e3dc; border-radius: 6px; padding: 8px 10px; margin-top: 8px; }
+      .meta-box .meta-k { color: #666; }
+      .meta-box .meta-poster-orig { color: #356096; font-weight: 600; }
+      .meta-box .meta-poster-crop { color: #1e9e78; font-weight: 600; }
+      .meta-box .meta-warn { color: #a65c00; }
     ")),
     tags$script(HTML("
       $(document).on('keydown', function(e) {
@@ -99,57 +105,6 @@ ui <- fluidPage(
   uiOutput("status_summary_ui"),
   tabsetPanel(
     id = "tabs",
-    tabPanel(
-      "Welcome",
-      br(),
-      div(
-        class = "panel-card welcome",
-        tags$h3("Make a monthly photo poster"),
-        tags$p(
-          "This app helps you place photos on a calendar grid (one slot per month), ",
-          "crop them to squares, and build a print-ready poster."
-        ),
-        tags$h3("Quick start"),
-        tags$ol(
-          tags$li(tags$strong("Add photos"), " — drop files into ", tags$code("images/import/"),
-                  ", or pick any file when you assign a slot."),
-          tags$li(tags$strong("Assign"), " — open the Assign tab, choose a month slot, then keep the current image, use a blank, use the demo tile, choose a new photo, or restore the previous one."),
-          tags$li(tags$strong("Crop"), " — zoom, pan, and rotate, then Save crop."),
-          tags$li(tags$strong("Poster"), " — generate from here, or render ", tags$code("poster.qmd"), " separately.")
-        ),
-        div(
-          class = "two-ways",
-          div(
-            class = "way",
-            tags$h4("Option A — all in the app"),
-            tags$p(
-              "Use the Poster tab and click ", tags$strong("Generate poster"),
-              ". The file appears in ", tags$code("output/"), " (usually ", tags$code("poster.jpg"), ")."
-            ),
-            actionButton("btn_goto_poster", "Go to Poster", class = "btn-primary btn-sm", style = "margin-top:10px;")
-          ),
-          div(
-            class = "way",
-            tags$h4("Option B — prep here, build separately"),
-            tags$p(
-              "Assign and crop in this app (saves decisions in ", tags$code("data/"),
-              "), then open ", tags$code("poster.qmd"),
-              " to fine-tune DPI, gaps, labels, and export. Render it in RStudio / Quarto; output still goes to ",
-              tags$code("output/"), "."
-            )
-          )
-        ),
-        tags$h3("Tips"),
-        tags$ul(
-          tags$li("Demo tiles in ", tags$code("images/demos/"), " are safe placeholders — the app never overwrites them."),
-          tags$li("New photos are copied into ", tags$code("images/"), " as names like ",
-                  tags$code("1205.jpg"), " or ", tags$code("1205_vacation.jpg"), "."),
-          tags$li("Choosing a new image keeps one backup so you can Restore once."),
-          tags$li("Click any cell on the Poster grid to jump straight to Crop for that slot.")
-        ),
-        actionButton("btn_dismiss_welcome", "Got it — open Assign", class = "btn-default", style = "margin-top:8px;")
-      )
-    ),
     tabPanel(
       "Poster",
       br(),
@@ -193,7 +148,7 @@ ui <- fluidPage(
           9,
           div(
             class = "panel-card",
-            div(class = "panel-h", "Grid preview — click a cell to open it"),
+            div(class = "panel-h", "Grid preview — click a cell to edit it"),
             div(class = "muted", "Filled cells show a thumbnail; empty or missing files are light grey."),
             br(),
             uiOutput("poster_grid_ui")
@@ -202,81 +157,74 @@ ui <- fluidPage(
       )
     ),
     tabPanel(
-      "Assign",
+      "Edit slot",
       br(),
-      fluidRow(
-        column(
-          4,
-          div(
-            class = "panel-card",
-            div(class = "panel-h", "Slot"),
-            selectInput("assign_slot", NULL, choices = character(0), width = "100%"),
-            div(class = "muted", textOutput("assign_slot_info"))
-          ),
-          div(
-            class = "panel-card source-choice",
-            div(class = "panel-h", "What to put in this slot"),
-            radioButtons(
-              "source_choice",
-              NULL,
-              choices = c(
-                "Keep current image" = "current",
-                "Blank (white)" = "blank",
-                "Demo color tile" = "demo",
-                "Choose new image…" = "new",
-                "Restore previous" = "restore"
-              ),
-              selected = "current"
+      # --- Assign (top) ---
+      div(
+        class = "panel-card",
+        div(class = "panel-h", "Assign image"),
+        fluidRow(
+          column(
+            3,
+            selectInput("slot_pick", "Slot", choices = character(0), width = "100%"),
+            fluidRow(
+              column(6, actionButton("btn_prev", "←", class = "btn-default", width = "100%")),
+              column(6, actionButton("btn_next", "→", class = "btn-default", width = "100%"))
             ),
+            div(class = "muted", style = "margin-top:8px;", "Arrow keys move between slots."),
+            uiOutput("image_meta_ui"),
             conditionalPanel(
               "input.source_choice == 'new'",
-              textInput("new_label", "Optional label (e.g. vacation → 1205_vacation.jpg)", value = ""),
-              fileInput("new_file", "Pick a file", accept = c("image/jpeg", "image/png", "image/webp", ".jpg", ".jpeg", ".png", ".webp")),
-              selectInput("import_pick", "Or pick from images/import/", choices = c("(none)" = ""), width = "100%"),
-              actionButton("btn_refresh_import", "Refresh import list", class = "btn-default btn-sm"),
-              checkboxInput("overwrite_img", "Overwrite if file exists", value = FALSE)
-            ),
-            br(),
-            actionButton("btn_apply_source", "Apply", class = "btn-primary", width = "100%"),
-            div(style = "margin-top:8px;", textOutput("assign_msg"))
-          )
-        ),
-        column(
-          8,
-          div(
-            class = "panel-card",
+              uiOutput("candidate_meta_ui")
+            )
+          ),
+          column(
+            5,
+            div(
+              class = "source-choice",
+              radioButtons(
+                "source_choice",
+                NULL,
+                choices = c(
+                  "Keep current image" = "current",
+                  "Blank (white)" = "blank",
+                  "Demo color tile" = "demo",
+                  "Choose new image…" = "new",
+                  "Restore previous" = "restore"
+                ),
+                selected = "current"
+              ),
+              conditionalPanel(
+                "input.source_choice == 'new'",
+                textInput("new_label", "Optional label (e.g. vacation → 1205_vacation.jpg)", value = ""),
+                fileInput("new_file", "Pick a file", accept = c("image/jpeg", "image/png", "image/webp", ".jpg", ".jpeg", ".png", ".webp")),
+                selectInput("import_pick", "Or pick from images/import/", choices = c("(none)" = ""), width = "100%"),
+                actionButton("btn_refresh_import", "Refresh import list", class = "btn-default btn-sm"),
+                checkboxInput("overwrite_img", "Overwrite if file exists", value = FALSE)
+              ),
+              actionButton("btn_apply_source", "Apply", class = "btn-primary", width = "100%"),
+              div(style = "margin-top:8px;", textOutput("assign_msg"))
+            )
+          ),
+          column(
+            4,
             div(class = "panel-h", "Import inbox"),
             div(class = "muted",
-                "Drop new photos into ", tags$code("images/import/"),
-                ", then assign them to a slot. Outside files chosen above are copied into ",
-                tags$code("images/"), " as ", tags$code("1205_label.jpg"), "."),
+                "Drop photos into ", tags$code("images/import/"),
+                ". Chosen files are copied into ", tags$code("images/"),
+                " as ", tags$code("1205_label.jpg"), "."),
             br(),
             uiOutput("import_thumbs_ui")
           )
         )
-      )
-    ),
-    tabPanel(
-      "Crop",
-      br(),
+      ),
+      # --- Crop (bottom) ---
       fluidRow(
         column(
           4,
           div(
             class = "panel-card",
-            div(class = "panel-h", "Slot"),
-            selectInput("crop_slot", NULL, choices = character(0), width = "100%"),
-            fluidRow(
-              column(4, actionButton("btn_prev", "←", class = "btn-default", width = "100%")),
-              column(4, actionButton("btn_next", "→", class = "btn-default", width = "100%")),
-              column(4, actionButton("btn_goto_assign", "Assign…", class = "btn-default btn-sm", width = "100%"))
-            ),
-            div(class = "muted", style = "margin-top:8px;", "Arrow keys move between slots."),
-            textOutput("crop_status")
-          ),
-          div(
-            class = "panel-card",
-            div(class = "panel-h", "Crop & view"),
+            div(class = "panel-h", "Crop"),
             numericInput("mag_pct", "Zoom % (100 = full square)", value = 100, min = 10, max = 10000, step = 1),
             fluidRow(
               column(5, actionButton("btn_rot_ccw", HTML("&#8635;"), class = "rot-btn btn-default", width = "100%", title = "Rotate CCW")),
@@ -296,8 +244,57 @@ ui <- fluidPage(
           8,
           div(
             class = "panel-card preview-box",
-            plotOutput("preview_plot", height = "560px")
+            plotOutput("preview_plot", height = "520px")
           )
+        )
+      )
+    ),
+    tabPanel(
+      "Help",
+      br(),
+      div(
+        class = "panel-card welcome",
+        tags$h3("Make a monthly photo poster"),
+        tags$p(
+          "This app helps you place photos on a calendar grid (one slot per month), ",
+          "crop them to squares, and build a print-ready poster."
+        ),
+        tags$h3("Quick start"),
+        tags$ol(
+          tags$li(tags$strong("Add photos"), " — drop files into ", tags$code("images/import/"),
+                  ", or pick any file when you assign a slot."),
+          tags$li(tags$strong("Edit slot"), " — choose a month, set the image (current / blank / demo / new / restore), then zoom, pan, rotate and Save crop."),
+          tags$li(tags$strong("Poster"), " — generate from the Poster tab, or render ", tags$code("poster.qmd"), " separately.")
+        ),
+        div(
+          class = "two-ways",
+          div(
+            class = "way",
+            tags$h4("Option A — all in the app"),
+            tags$p(
+              "Use the Poster tab and click ", tags$strong("Generate poster"),
+              ". The file appears in ", tags$code("output/"), " (usually ", tags$code("poster.jpg"), ")."
+            ),
+            actionButton("btn_goto_poster", "Go to Poster", class = "btn-primary btn-sm", style = "margin-top:10px;")
+          ),
+          div(
+            class = "way",
+            tags$h4("Option B — prep here, build separately"),
+            tags$p(
+              "Assign and crop in this app (saves decisions in ", tags$code("data/"),
+              "), then open ", tags$code("poster.qmd"),
+              " to fine-tune DPI, gaps, labels, and export. Render it in RStudio / Quarto; output still goes to ",
+              tags$code("output/"), "."
+            )
+          )
+        ),
+        tags$h3("Tips"),
+        tags$ul(
+          tags$li("Demo tiles in ", tags$code("images/demos/"), " are safe placeholders — the app never overwrites them."),
+          tags$li("New photos are copied into ", tags$code("images/"), " as names like ",
+                  tags$code("1205.jpg"), " or ", tags$code("1205_vacation.jpg"), "."),
+          tags$li("Choosing a new image keeps one backup so you can Restore once."),
+          tags$li("Click any cell on the Poster grid to jump to Edit slot for that month.")
         )
       )
     )
@@ -361,8 +358,7 @@ server <- function(input, output, session) {
     ch <- rv$slots$slot
     names(ch) <- paste0(rv$slots$slot, " — ", basename(as.character(rv$slots$file_name)))
     sel <- rv$slots$slot[min(max(rv$idx, 1L), length(ch))]
-    updateSelectInput(session, "assign_slot", choices = ch, selected = sel)
-    updateSelectInput(session, "crop_slot", choices = ch, selected = sel)
+    updateSelectInput(session, "slot_pick", choices = ch, selected = sel)
   }
 
   observe({
@@ -387,18 +383,12 @@ server <- function(input, output, session) {
     if (n < 1L) return(invisible(NULL))
     rv$idx <- min(max(as.integer(i), 1L), n)
     slot <- rv$slots$slot[rv$idx]
-    updateSelectInput(session, "assign_slot", selected = slot)
-    updateSelectInput(session, "crop_slot", selected = slot)
+    updateSelectInput(session, "slot_pick", selected = slot)
     sync_crop_inputs()
   }
 
-  observeEvent(input$assign_slot, {
-    w <- which(rv$slots$slot == input$assign_slot)
-    if (length(w) == 1L && w != rv$idx) set_idx(w)
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$crop_slot, {
-    w <- which(rv$slots$slot == input$crop_slot)
+  observeEvent(input$slot_pick, {
+    w <- which(rv$slots$slot == input$slot_pick)
     if (length(w) == 1L && w != rv$idx) set_idx(w)
   }, ignoreInit = TRUE)
 
@@ -409,25 +399,37 @@ server <- function(input, output, session) {
     if (identical(input$key_nav$dir, "next")) set_idx(rv$idx + 1L)
   })
 
-  observeEvent(input$btn_goto_assign, {
-    updateTabsetPanel(session, "tabs", selected = "Assign")
-  })
-
   observeEvent(input$btn_goto_poster, {
     updateTabsetPanel(session, "tabs", selected = "Poster")
-  })
-
-  observeEvent(input$btn_dismiss_welcome, {
-    updateTabsetPanel(session, "tabs", selected = "Assign")
   })
 
   observeEvent(input$grid_pick_slot, {
     w <- which(rv$slots$slot == input$grid_pick_slot)
     if (length(w) == 1L) {
       set_idx(w)
-      updateTabsetPanel(session, "tabs", selected = "Crop")
+      updateTabsetPanel(session, "tabs", selected = "Edit slot")
     }
   })
+
+  # Greeting popup once per session
+  session$onFlushed(function() {
+    showModal(modalDialog(
+      title = "Welcome to Collage",
+      easyClose = TRUE,
+      footer = modalButton("Got it"),
+      tags$p("Place one photo per month, crop to a square, then make a print-ready poster."),
+      tags$ul(
+        tags$li(tags$strong("Poster"), " — see the grid and generate ", tags$code("output/poster.jpg"), "."),
+        tags$li(tags$strong("Edit slot"), " — assign a photo (or blank / demo), then crop."),
+        tags$li(tags$strong("Help"), " — full walkthrough anytime.")
+      ),
+      tags$p(
+        style = "color:#777;font-size:12px;",
+        "You can build the poster here, or prep images in the app and render ",
+        tags$code("poster.qmd"), " separately for fine-tuning."
+      )
+    ))
+  }, once = TRUE)
 
   current_row <- reactive({
     req(rv$slots, nrow(rv$slots) >= 1L)
@@ -473,22 +475,125 @@ server <- function(input, output, session) {
     rv$img_w <- info$width[1]
     rv$img_h <- info$height[1]
     rv$S0 <- min(info$width[1], info$height[1])
+    # Persist original (unrotated) source size into slots when missing/stale
+    i <- isolate(rv$idx)
+    if (!is.null(i) && i >= 1L && i <= nrow(rv$slots)) {
+      meta0 <- read_image_meta(p)
+      need <- is.na(rv$slots$src_w[i]) || is.na(rv$slots$src_h[i]) ||
+        (!is.na(meta0$w) && (rv$slots$src_w[i] != meta0$w || rv$slots$src_h[i] != meta0$h))
+      if (isTRUE(need) && meta0$exists) {
+        rv$slots$src_w[i] <- meta0$w
+        rv$slots$src_h[i] <- meta0$h
+        rv$slots$src_bytes[i] <- meta0$bytes
+        persist_slots()
+      }
+    }
   })
 
   output$rotate_label <- renderText(paste0(rv$rot_cw, "°"))
   observeEvent(input$btn_rot_cw, { rv$rot_cw <- as.integer((rv$rot_cw + 90) %% 360) })
   observeEvent(input$btn_rot_ccw, { rv$rot_cw <- as.integer((rv$rot_cw + 270) %% 360) })
 
-  output$crop_status <- renderText({
+  output$image_meta_ui <- renderUI({
     row <- current_row()
-    p <- current_src_path()
-    fn <- row$file_name[[1L]]
-    if (is.na(p) || !file.exists(p)) {
-      return(paste0("Missing file: ", fn))
+    rel <- as.character(row$file_name[[1L]])
+    src <- current_src_path()
+    meta <- read_image_meta(src)
+    kind <- source_kind_label(rel)
+    crop_path <- cropped_file_for_slot(row, cropped_dir())
+    uses_crop <- isTRUE(row$use_cropped[[1L]]) && !is.na(crop_path)
+    crop_meta <- if (!is.na(crop_path)) read_image_meta(crop_path) else NULL
+
+    bak <- row$file_name_bak[[1L]]
+    bak_line <- if (!is.na(bak) && nzchar(as.character(bak))) {
+      tags$div(tags$span(class = "meta-k", "Backup: "), as.character(bak))
+    } else {
+      NULL
     }
-    paste0(
-      basename(fn), " — ", rv$img_w, "×", rv$img_h, " px",
-      if (isTRUE(row$use_cropped[[1L]])) " · crop saved" else ""
+
+    poster_line <- if (uses_crop) {
+      tags$div(
+        tags$span(class = "meta-poster-crop", "Poster uses: cropped copy"),
+        tags$div(
+          class = "muted",
+          paste0(basename(crop_path), " — ", fmt_px(crop_meta$w, crop_meta$h),
+                 " · ", fmt_bytes(crop_meta$bytes))
+        )
+      )
+    } else if (isTRUE(row$use_cropped[[1L]]) && is.na(crop_path)) {
+      tags$div(
+        tags$span(class = "meta-warn", "Poster flag says cropped, but crop file is missing"),
+        tags$div(class = "muted", "Will fall back to the original until you Save crop again.")
+      )
+    } else {
+      tags$div(
+        tags$span(class = "meta-poster-orig", "Poster uses: original"),
+        tags$div(class = "muted", "No saved crop — square-fitted from the source at render time.")
+      )
+    }
+
+    work_line <- if (!is.na(rv$img_w) && !is.na(rv$img_h) && rv$rot_cw != 0) {
+      tags$div(
+        tags$span(class = "meta-k", "Working view (rotated): "),
+        fmt_px(rv$img_w, rv$img_h)
+      )
+    } else {
+      NULL
+    }
+
+    if (!isTRUE(meta$exists)) {
+      return(div(
+        class = "meta-box",
+        tags$div(tags$strong("Source missing")),
+        tags$div(rel),
+        poster_line,
+        bak_line
+      ))
+    }
+
+    div(
+      class = "meta-box",
+      tags$div(tags$span(class = "meta-k", "Source: "), tags$code(rel)),
+      tags$div(tags$span(class = "meta-k", "Kind: "), kind),
+      tags$div(
+        tags$span(class = "meta-k", "Original size: "),
+        fmt_px(meta$w, meta$h),
+        " · ", fmt_bytes(meta$bytes),
+        if (!is.na(meta$format)) paste0(" · ", meta$format) else ""
+      ),
+      work_line,
+      poster_line,
+      bak_line
+    )
+  })
+
+  output$candidate_meta_ui <- renderUI({
+    src <- NULL
+    label <- NULL
+    if (!is.null(input$new_file) && is.data.frame(input$new_file) && nrow(input$new_file) >= 1L &&
+        nzchar(input$new_file$datapath[1])) {
+      src <- input$new_file$datapath[1]
+      label <- input$new_file$name[1]
+    } else if (!is.null(input$import_pick) && nzchar(input$import_pick)) {
+      src <- input$import_pick
+      label <- basename(src)
+    }
+    if (is.null(src)) {
+      return(div(class = "meta-box muted", "Pick a file or import to see its size before Apply."))
+    }
+    meta <- read_image_meta(src)
+    if (!meta$exists) {
+      return(div(class = "meta-box meta-warn", "Selected file not found."))
+    }
+    div(
+      class = "meta-box",
+      tags$div(tags$strong("About to assign")),
+      tags$div(tags$span(class = "meta-k", "File: "), label),
+      tags$div(
+        tags$span(class = "meta-k", "Size: "),
+        fmt_px(meta$w, meta$h), " · ", fmt_bytes(meta$bytes),
+        if (!is.na(meta$format)) paste0(" · ", meta$format) else ""
+      )
     )
   })
 
@@ -554,6 +659,12 @@ server <- function(input, output, session) {
         rv$slots$crop_left[i] <- b$left
         rv$slots$crop_top[i] <- b$top
         rv$slots$use_cropped[i] <- TRUE
+        meta0 <- read_image_meta(src)
+        if (meta0$exists) {
+          rv$slots$src_w[i] <- meta0$w
+          rv$slots$src_h[i] <- meta0$h
+          rv$slots$src_bytes[i] <- meta0$bytes
+        }
         persist_slots()
         rv$grid_nonce <- rv$grid_nonce + 1L
         showNotification(paste0("Saved crop for ", slot, "."), type = "message")
@@ -580,12 +691,6 @@ server <- function(input, output, session) {
     refresh_import_choices()
   })
   observeEvent(input$btn_refresh_import, refresh_import_choices())
-
-  output$assign_slot_info <- renderText({
-    row <- current_row()
-    bak <- if (row_has_backup(row)) paste0(" · backup: ", basename(row$file_name_bak[[1L]])) else ""
-    paste0("Current: ", row$file_name[[1L]], bak)
-  })
 
   output$assign_msg <- renderText(rv$assign_msg)
 
@@ -644,7 +749,7 @@ server <- function(input, output, session) {
             if (!dir.exists(demos)) dir.create(demos, recursive = TRUE)
             make_blank()
           }
-          rv$slots <- update_slot_source(rv$slots, i, blank_rel, archive = TRUE, reset_crop = TRUE)
+          rv$slots <- update_slot_source(rv$slots, i, blank_rel, archive = TRUE, reset_crop = TRUE, images_dir = img)
           persist_slots()
           sync_slot_selectors()
           sync_crop_inputs()
@@ -660,7 +765,7 @@ server <- function(input, output, session) {
           if (!file.exists(demo_abs)) {
             stop("Demo tile missing for ", slot, ". Run assets/setup.R with demo = TRUE.")
           }
-          rv$slots <- update_slot_source(rv$slots, i, demo_rel, archive = TRUE, reset_crop = TRUE)
+          rv$slots <- update_slot_source(rv$slots, i, demo_rel, archive = TRUE, reset_crop = TRUE, images_dir = img)
           persist_slots()
           sync_slot_selectors()
           sync_crop_inputs()
@@ -685,14 +790,13 @@ server <- function(input, output, session) {
             src, img, slot, label = label,
             overwrite = isTRUE(input$overwrite_img)
           )
-          rv$slots <- update_slot_source(rv$slots, i, rel, archive = TRUE, reset_crop = TRUE)
+          rv$slots <- update_slot_source(rv$slots, i, rel, archive = TRUE, reset_crop = TRUE, images_dir = img)
           persist_slots()
           sync_slot_selectors()
           sync_crop_inputs()
           rv$grid_nonce <- rv$grid_nonce + 1L
           rv$assign_msg <- paste0("Assigned ", rel, " to slot ", slot, " (previous saved to backup).")
           showNotification(rv$assign_msg, type = "message")
-          updateTabsetPanel(session, "tabs", selected = "Crop")
           return(invisible(NULL))
         }
       },

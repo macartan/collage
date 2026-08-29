@@ -56,11 +56,11 @@ Or in R:
 shiny::runApp(".")
 ```
 
-Start on the **Welcome** tab for a short orientation.
+Start on the **Poster** tab. A short greeting pops up once; **Help** (last tab) has the full walkthrough anytime.
 
-### 3. Assign photos to months
+### 3. Assign & crop
 
-Open **Assign**. Pick a slot (e.g. `1205` = May 2012). Then choose:
+Open **Edit slot**. Pick a month (e.g. `1205` = May 2012). At the top, choose what goes in the slot; below, crop it.
 
 | Choice | What it does |
 |--------|----------------|
@@ -70,13 +70,9 @@ Open **Assign**. Pick a slot (e.g. `1205` = May 2012). Then choose:
 | Choose new image… | Copy a photo into `images/` as `1205.jpg` or `1205_vacation.jpg` |
 | Restore previous | Undo the last replace (one step) |
 
-Choosing a new image stores the previous mapping in backup fields so Restore works once.
+Choosing a new image stores the previous mapping in backup fields so Restore works once. Then use **Crop** on the same tab (zoom / pan / rotate → **Save crop**). Clicking a cell on the Poster grid opens that slot here.
 
-### 4. Crop
-
-Open **Crop** (or click a cell on the Poster grid). Zoom, pan, rotate → **Save crop**. Crops land in `cropped/`; settings are stored in `data/slots.csv`.
-
-### 5. Make the poster
+### 4. Make the poster
 
 **Option A — in the app**  
 Poster tab → **Generate poster** → find `output/poster.jpg`.
@@ -101,6 +97,8 @@ Edit the options at the top of `poster.qmd` (DPI, gap, labels, …), then render
 | `output/` | Generated poster |
 
 You can point the app at another images folder on the Poster tab; that path is saved in the profile.
+
+Image sizes for each **assigned** slot live in `data/slots.csv` (`src_w` / `src_h` / `src_bytes`). There is no separate image catalogue — import-folder files are measured on demand when you select them.
 
 ---
 

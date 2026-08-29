@@ -2,6 +2,77 @@
 
 IMAGE_EXTS <- "\\.(jpg|jpeg|png|webp)$"
 
+#' Read width/height/bytes/format from a file (no catalogue needed).
+read_image_meta <- function(path) {
+  out <- list(
+    exists = FALSE,
+    path = NA_character_,
+    w = NA_real_,
+    h = NA_real_,
+    bytes = NA_real_,
+    format = NA_character_
+  )
+  if (!is.character(path) || length(path) != 1L || is.na(path) || !nzchar(path) || !file.exists(path)) {
+    return(out)
+  }
+  out$exists <- TRUE
+  out$path <- canonical_fs_path(path)
+  fi <- suppressWarnings(file.info(path))
+  out$bytes <- as.numeric(fi$size)
+  ext <- tolower(tools::file_ext(path))
+  out$format <- if (nzchar(ext)) toupper(ext) else NA_character_
+  dims <- tryCatch(
+    {
+      info <- image_info(read_source_image(path))
+      list(w = as.numeric(info$width[1]), h = as.numeric(info$height[1]))
+    },
+    error = function(e) list(w = NA_real_, h = NA_real_)
+  )
+  out$w <- dims$w
+  out$h <- dims$h
+  out
+}
+
+fmt_bytes <- function(n) {
+  if (is.null(n) || length(n) != 1L || is.na(n)) return("?")
+  if (n < 1024) return(paste0(round(n), " B"))
+  if (n < 1024^2) return(paste0(round(n / 1024, 1), " KB"))
+  paste0(round(n / 1024^2, 2), " MB")
+}
+
+fmt_px <- function(w, h) {
+  if (is.na(w) || is.na(h)) return("size unknown")
+  paste0(as.integer(w), " × ", as.integer(h), " px")
+}
+
+source_kind_label <- function(rel_path) {
+  if (is.na(rel_path) || !nzchar(rel_path)) return("none")
+  rel <- gsub("\\\\", "/", rel_path)
+  if (grepl("/blank\\.jpg$", rel, ignore.case = TRUE) || identical(basename(rel), "blank.jpg")) {
+    return("blank placeholder")
+  }
+  if (grepl("^demos/", rel, ignore.case = TRUE)) {
+    return("demo tile")
+  }
+  "your photo"
+}
+
+#' Cropped file path for a slot if it exists on disk.
+cropped_file_for_slot <- function(row, cropped_dir) {
+  slot <- row$slot[[1L]]
+  rel <- row$file_name[[1L]]
+  candidates <- c(
+    file.path(cropped_dir, paste0(slot, ".jpg")),
+    file.path(cropped_dir, paste0(slot, ".jpeg")),
+    file.path(cropped_dir, paste0(slot, ".png")),
+    if (!is.na(rel) && nzchar(as.character(rel))) file.path(cropped_dir, basename(rel)) else NULL
+  )
+  for (c in candidates) {
+    if (!is.null(c) && file.exists(c)) return(canonical_fs_path(c))
+  }
+  NA_character_
+}
+
 list_image_files <- function(dir, recursive = FALSE) {
   if (!dir.exists(dir)) return(character(0))
   files <- list.files(
