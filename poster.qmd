@@ -1,0 +1,184 @@
+---
+format:
+  html:
+    title: "Collage poster"
+    theme: none
+    embed-resources: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+# Poster layout options — edit these, then render this file (Quarto or RStudio Knit).
+# The Shiny app can also build a poster; use this file when you want fine control
+# (DPI, labels, cell cache, PNG export) without opening the app.
+
+# NULL = take value from data/profile.csv
+rows <- NULL
+cols <- NULL
+spacing_mm <- NULL
+dpi <- 450              # print resolution (profile default is often 300)
+paper <- NULL           # "A1", "A2", …
+orientation <- NULL     # "portrait" or "landscape"
+add_name <- FALSE       # superimpose slot label on each cell
+export_png <- FALSE     # also write output/poster.png
+export_pdf <- FALSE     # also write output/poster.pdf
+refresh_cell_cache <- FALSE  # TRUE = rebuild cached cell tiles
+
+label_from_path <- function(path) {
+  stem <- tools::file_path_sans_ext(basename(path))
+  m <- regexpr("^\\d{4}", stem, perl = TRUE)
+  if (m > 0) return(regmatches(stem, m))
+  stem
+}
+```
+
+```{r}
+#| results: asis
+suppressPackageStartupMessages(library(magick))
+
+proj_root <- tryCatch(
+  dirname(normalizePath(knitr::current_input(dir = TRUE), winslash = "/", mustWork = FALSE)),
+  error = function(e) NA_character_,
+  warning = function(w) NA_character_
+)
+if (is.na(proj_root) || !nzchar(proj_root)) {
+  proj_root <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+}
+
+for (f in c("paths.R", "slots.R", "crop.R", "images.R", "poster.R")) {
+  source(file.path(proj_root, "R", f), local = FALSE)
+}
+
+lay <- default_layout(proj_root)
+ensure_project_dirs(lay)
+prof <- read_profile(lay$profile, root = proj_root)
+
+pick <- function(override, fallback) {
+  if (is.null(override) || (length(override) == 1L && is.na(override))) fallback else override
+}
+
+rows <- max(1L, as.integer(pick(rows, prof$rows)))
+cols <- max(1L, as.integer(pick(cols, prof$cols)))
+spacing_mm <- as.numeric(pick(spacing_mm, prof$spacing_mm))
+dpi <- as.integer(pick(dpi, prof$dpi))
+paper <- as.character(pick(paper, prof$paper))
+orientation <- as.character(pick(orientation, prof$orientation))
+
+images_dir <- prof$images_dir
+if (!grepl("^[A-Za-z]:[/\\\\]", images_dir) && !startsWith(images_dir, "/")) {
+  images_dir <- file.path(proj_root, images_dir)
+}
+images_dir <- canonical_fs_path(images_dir)
+cropped_dir <- lay$cropped
+output_dir <- lay$output
+
+slots_df <- read_slots(lay$slots, prof$start_yymm, prof$end_yymm)
+n_want <- rows * cols
+if (nrow(slots_df) < 1L) {
+  cat("No slots in `data/slots.csv`. Run `assets/setup.R` first.\n")
+} else {
+  sz <- paper_mm(paper, orientation)
+  canvas_w <- as.integer(round((sz$w_mm / 25.4) * dpi))
+  canvas_h <- as.integer(round((sz$h_mm / 25.4) * dpi))
+  spacing <- max(0L, as.integer(round((spacing_mm / 25.4) * dpi)))
+
+  usable_w <- canvas_w - (cols - 1L) * spacing
+  usable_h <- canvas_h - (rows - 1L) * spacing
+  cell <- as.integer(floor(min(usable_w / cols, usable_h / rows)))
+  if (cell < 1L) stop("Spacing too large for rows/cols on this paper.")
+
+  grid_w <- cols * cell + (cols - 1L) * spacing
+  grid_h <- rows * cell + (rows - 1L) * spacing
+  margin_x <- as.integer(floor((canvas_w - grid_w) / 2))
+  margin_y <- as.integer(floor((canvas_h - grid_h) / 2))
+  font_size <- max(12L, as.integer(floor(cell * 0.22)))
+
+  cell_cache_dir <- file.path(
+    proj_root,
+    "poster_assets",
+    sprintf("cell_cache_c%d_d%d_%s", cell, dpi, if (isTRUE(add_name)) "lbl" else "plain")
+  )
+  dir.create(cell_cache_dir, recursive = TRUE, showWarnings = FALSE)
+  cache_hits <- 0L
+  cache_misses <- 0L
+
+  canvas <- image_blank(width = canvas_w, height = canvas_h, color = "white")
+  n_slots <- min(nrow(slots_df), n_want)
+
+  for (i in seq_len(n_slots)) {
+    r <- ((i - 1L) %/% cols)
+    c <- ((i - 1L) %% cols)
+    x <- margin_x + c * (cell + spacing)
+    y <- margin_y + r * (cell + spacing)
+
+    src_file <- slot_render_path(slots_df[i, , drop = FALSE], images_dir, cropped_dir)
+    if (is.na(src_file) || !file.exists(src_file)) next
+
+    stem <- slots_df$slot[i]
+    cache_jpg <- file.path(cell_cache_dir, paste0(stem, ".jpg"))
+
+    im <- NULL
+    if (file.exists(cache_jpg)) {
+      cm <- file.info(cache_jpg)$mtime
+      sm <- file.info(src_file)$mtime
+      can_use_cache <- !isTRUE(refresh_cell_cache)
+      if (isTRUE(refresh_cell_cache) && !is.na(cm) && !is.na(sm) && cm >= sm) {
+        can_use_cache <- TRUE
+      }
+      if (isTRUE(can_use_cache)) {
+        im <- image_read(cache_jpg)
+        cache_hits <- cache_hits + 1L
+      }
+    }
+    if (is.null(im)) {
+      cache_misses <- cache_misses + 1L
+      im <- read_source_image(src_file)
+      info <- image_info(im)
+      side0 <- max(info$width[1], info$height[1])
+      im <- image_extent(im, geometry = sprintf("%dx%d", side0, side0), gravity = "center", color = "white")
+      im <- image_resize(im, sprintf("%dx%d!", cell, cell))
+      if (isTRUE(add_name)) {
+        im <- image_annotate(
+          im,
+          label_from_path(src_file),
+          gravity = "center",
+          size = font_size,
+          color = "white",
+          strokecolor = "black"
+        )
+      }
+      image_write(im, path = cache_jpg, format = "jpeg", quality = 98)
+    }
+    canvas <- image_composite(canvas, im, offset = sprintf("+%d+%d", x, y))
+  }
+
+  out_jpg <- file.path(output_dir, "poster.jpg")
+  out_png <- file.path(output_dir, "poster.png")
+  out_pdf <- file.path(output_dir, "poster.pdf")
+  image_write(canvas, path = out_jpg, format = "jpeg", quality = 95)
+  if (isTRUE(export_png)) {
+    image_write(canvas, path = out_png, format = "png")
+  }
+  if (isTRUE(export_pdf)) {
+    tryCatch(image_write(canvas, path = out_pdf, format = "pdf"), error = function(e) NULL)
+  }
+
+  # Preview in the rendered HTML (copy sits in output/ for printing)
+  preview_tmp <- file.path(proj_root, "_poster_preview.jpg")
+  image_write(image_resize(canvas, "1200x"), path = preview_tmp, format = "jpeg", quality = 85)
+  cat(sprintf("![](./%s){width=100%%}\n\n", basename(preview_tmp)))
+  cat(sprintf(
+    "Saved **`output/poster.jpg`** (%s %s, %d×%d cells, %d dpi).\n\n",
+    paper, orientation, rows, cols, dpi
+  ))
+  cat(sprintf(
+    "Cell cache: `%s` | hits: %d | rebuilt: %d\n",
+    gsub("\\\\", "/", cell_cache_dir), cache_hits, cache_misses
+  ))
+  if (isTRUE(export_png)) cat("\nAlso saved `output/poster.png`.\n")
+  if (isTRUE(export_pdf) && file.exists(out_pdf)) cat("\nAlso saved `output/poster.pdf`.\n")
+}
+```

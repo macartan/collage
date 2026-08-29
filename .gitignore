@@ -1,0 +1,34 @@
+# R / editor
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Quarto / knit leftovers
+/_poster_preview.jpg
+_poster_preview.jpg
+.quarto/
+*_files/
+
+# Generated posters & caches (rebuild anytime)
+output/*
+!output/.gitkeep
+cropped/*
+!cropped/.gitkeep
+poster_assets/
+
+# User drop zone — keep folder, ignore contents
+images/import/*
+!images/import/.gitkeep
+
+# Keep demos; ignore other user photos at images root
+images/*
+!images/demos/
+!images/demos/**
+!images/import/
+!images/import/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
