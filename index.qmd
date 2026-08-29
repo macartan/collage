@@ -1,10 +1,13 @@
 ---
 title: "Collage"
-subtitle: "Month-by-month photo posters"
+subtitle: "Month-by-month photo posters — user guide"
 format:
   html:
     theme: flatly
-    toc: false
+    toc: true
+    toc-depth: 2
+    toc-location: left
+    number-sections: false
     embed-resources: false
     link-external-newwindow: true
     title-block-banner: false
@@ -14,49 +17,131 @@ execute:
 
 **Collage** turns a folder of photos into a print-ready poster: one picture per slot on a calendar-style grid.
 
-It is good for family timelines, project archives, “one photo per month” walls — anything where the story is a grid over time.
+Good for family timelines, project archives, “one photo per month” walls — anything where the story is a grid over time.
+
+This page is the main guide. The repo README is a short pointer; details live here: <https://macartan.github.io/collage/>.
 
 ![Example collage poster](assets/example.jpg){fig-alt="Example monthly photo collage poster" width=70%}
 
-<p class="caption-note">Example output — your photos, your crops, same idea.</p>
+::: {.caption-note}
+Example output — your photos, your crops, same idea.
+:::
 
 ## What you get
 
 - A **Shiny app** (`app.R`) to assign photos to slots, crop them to squares, and generate a poster into `output/`
 - Optional **`poster.qmd`** to fine-tune DPI, gaps, and labels without opening the app
 - Safe **demo tiles** under `images/demos/` so a fresh copy works before you add real photos
+- **Archives** under `archive/<project_name>/` so you can save a layout and start another without losing work
+
+## Requirements
+
+- [R](https://cran.r-project.org/) (4.x recommended)
+- Packages:
+
+```r
+install.packages(c("shiny", "magick", "base64enc"))
+```
+
+For `poster.qmd`, [Quarto](https://quarto.org/) (or Knit from RStudio) helps.
 
 ## Default grid
 
-The starter layout is **12 months × 19 years** (slots `0801` … `2612` — January 2008 through December 2026), laid out as a **12-column × 19-row** poster on A1 paper.
+The starter layout is **12 months × 19 years** (slots `0801` … `2612` — January 2008 through December 2026), as a **12-column × 19-row** poster on A1 paper.
 
-You can change that in the app’s **Setup** tab (danger zone): rows, columns, gap, paper size, and how slots are named (year–month calendar, row×column ids, or simple `1…n`). Reshape **resets** slot data and can recreate demos for the new cells.
-
-> After editing this file, re-render with Quarto (`quarto render index.qmd`) to refresh `index.html`, or edit `index.html` directly if Quarto is not installed.
+Change this in the app’s **Setup** tab (danger zone): rows, columns, gap, paper size, and how slots are named (year–month calendar, row×column ids, or simple `1…n`). Reshape **resets** slot data and can recreate demos for the new cells. Example for **10 years from 2015**: start `1501`, end `2412` → 10×12 with auto rows/cols.
 
 ## Quick start
 
-1. Install R packages: `shiny`, `magick`, `base64enc`
-2. Open this folder in R / RStudio
-3. If demos are missing: `source("assets/setup.R"); setup_collage(demo = TRUE)`
-4. Run the app: `shiny::runApp(".")`
-5. Put photos in `images/import/` (or pick files in **Edit slot**), crop, then **Generate poster**
+1. Install the R packages above.
+2. Open this folder in R / RStudio.
+3. If demos are missing: `source("assets/setup.R"); setup_collage(demo = TRUE)`.
+4. Run the app: `shiny::runApp(".")`.
+5. **Fast path with named files:** put photos in `images/` (or `images/import/`) named for their slots — e.g. `1205.jpg` or `1205_vacation.jpg`.
+6. On the **Poster** tab, click **Smart load** (use the **?** help beside it). It fills demo/blank slots when exactly one matching filename exists; no match or several matches leave that slot alone.
+7. Crop any cells you care about, then **Generate poster** → `output/poster.jpg`.
 
-Full walkthrough: see [README.md](README.md).
+You can also assign photos one-by-one on **Edit slot** if names don’t match.
+
+## Smart load
+
+Smart load is the quickest way in when a folder of photos already uses slot names.
+
+| Situation | What happens |
+|-----------|----------------|
+| Slot still on demo/blank fill, **exactly one** file matches (e.g. `1205` / `1205_trip.jpg`) | Assigned automatically |
+| **No** matching file | Slot unchanged |
+| **Several** matching files | Slot unchanged (ambiguous); listed in the status message |
+| Slot already assigned by you | Never overwritten |
+
+Matches are looked up in `images/` and `images/import/` (not inside `images/demos/`). Files in `import/` are copied into `images/` when assigned.
+
+## Using the app
+
+### Poster tab
+
+- Grid preview — click a cell to edit it
+- **Generate poster** — writes `output/poster.jpg` (or the open archive’s `output/`)
+- **Smart load** — see above
+- Layout and images-folder path — saved in `data/profile.csv`
+
+### Edit slot
+
+- Assign: keep current / blank / demo / choose new / restore previous
+- Crop: zoom, pan, rotate, optional saved size (px), then Save crop → `cropped/`
+
+### Setup (danger zone)
+
+- Restore defaults
+- Reshape grid / year range / naming scheme (resets live slot data)
+- **Archives** — save, open in place, restore into live, or delete projects under `archive/<name>/`
+
+### Help tab
+
+Same orientation as this guide, inside the app.
 
 ## Two ways to make the poster
 
 | In the app | Fine-tune separately |
 |------------|----------------------|
-| **Poster** tab → Generate poster → `output/poster.jpg` | Prep images in the app, then render `poster.qmd` for print control |
+| **Poster** tab → Generate poster → `output/poster.jpg` | Prep in the app, then render `poster.qmd` for print control |
 
----
+## Archives
+
+Projects are stored as folders (not zip files):
+
+```
+archive/my_project/
+  data/          # profile + slots
+  cropped/       # optional square crops
+  output/        # posters for this project
+  manifest.csv
+```
+
+Photos under `images/` are **shared** and not copied into the archive. Open an archive to edit it in place, or restore it into the live workspace.
+
+## Folder map
+
+| Path | Role |
+|------|------|
+| `app.R` | Main app |
+| `poster.qmd` | Optional high-control poster render |
+| `images/demos/` | Demo tiles + `blank.jpg` |
+| `images/import/` | Drop zone |
+| `images/` | Your assigned photos (`1205_label.jpg`) |
+| `cropped/` | Square crops when saved |
+| `data/` | Live profile + slots |
+| `archive/` | Saved projects |
+| `output/` | Live poster output |
+
+## Source & README
+
+- Live guide (this page): <https://macartan.github.io/collage/>
+- Repository notes: [README.md](README.md)
+
+After editing `index.qmd`, run `quarto render index.qmd` to refresh `index.html` if Quarto is installed; otherwise edit `index.html` to match.
 
 <style>
-body { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
-h1.title { font-size: 2rem; margin-bottom: 0.15rem; }
-.subtitle { color: #555; margin-top: 0; }
-img { border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.12); max-width: 70%; height: auto; display: block; margin-left: auto; margin-right: auto; }
 .caption-note { color: #777; font-size: 0.9rem; margin-top: -0.5rem; margin-bottom: 1.5rem; text-align: center; }
-table { width: 100%; }
+img { border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
 </style>

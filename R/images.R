@@ -89,6 +89,102 @@ list_import_files <- function(import_dir) {
   list_image_files(import_dir, recursive = FALSE)
 }
 
+#' User images eligible for smart-load matching (images/ root + import/, not demos/).
+list_smart_load_candidates <- function(images_dir) {
+  root_files <- list_image_files(images_dir, recursive = FALSE)
+  # Exclude anything that somehow resolved under demos
+  demos <- canonical_fs_path(file.path(images_dir, "demos"))
+  root_files <- root_files[vapply(root_files, function(p) {
+    !paths_equivalent(canonical_fs_path(dirname(p)), demos)
+  }, logical(1))]
+
+  import_dir <- file.path(images_dir, "import")
+  import_files <- list_import_files(import_dir)
+  c(root_files, import_files)
+}
+
+#' TRUE if slot still uses a default placeholder (demo tile or blank).
+slot_has_default_fill <- function(file_name) {
+  if (is.null(file_name) || length(file_name) != 1L || is.na(file_name) || !nzchar(as.character(file_name))) {
+    return(TRUE)
+  }
+  rel <- gsub("\\\\", "/", as.character(file_name))
+  grepl("^demos/", rel, ignore.case = TRUE)
+}
+
+#' Match candidate files to a slot id (stem is slot or slot_label).
+files_matching_slot <- function(paths, slot) {
+  if (length(paths) == 0) return(character(0))
+  keep <- vapply(paths, function(p) {
+    stem_matches_slot(tools::file_path_sans_ext(basename(p)), slot)
+  }, logical(1))
+  paths[keep]
+}
+
+#' Smart-load: for default-fill slots, assign uniquely named images from images/ (+ import/).
+#'
+#' - 0 matches → leave slot unchanged
+#' - 1 match → assign (copy from import/ into images/ if needed)
+#' - 2+ matches → leave unchanged (ambiguous)
+#'
+#' @return list(slots, n_assigned, n_skipped_none, n_skipped_multi, assigned, ambiguous)
+smart_load_slots <- function(slots_df, images_dir) {
+  slots_df <- ensure_slot_columns(slots_df)
+  candidates <- list_smart_load_candidates(images_dir)
+  assigned <- character(0)
+  ambiguous <- list()
+  n_none <- 0L
+
+  for (i in seq_len(nrow(slots_df))) {
+    if (!slot_has_default_fill(slots_df$file_name[i])) next
+    slot <- as.character(slots_df$slot[i])
+    hits <- files_matching_slot(candidates, slot)
+    if (length(hits) == 0L) {
+      n_none <- n_none + 1L
+      next
+    }
+    if (length(hits) > 1L) {
+      ambiguous[[slot]] <- basename(hits)
+      next
+    }
+    src <- hits[1]
+    # Prefer relative path under images/; copy out of import/ first
+    import_dir <- canonical_fs_path(file.path(images_dir, "import"))
+    if (paths_equivalent(canonical_fs_path(dirname(src)), import_dir)) {
+      # Keep original basename if it already matches slot[_label]; else rename to slot.ext
+      stem <- tools::file_path_sans_ext(basename(src))
+      if (stem_matches_slot(stem, slot)) {
+        dest_name <- basename(src)
+        dest_path <- file.path(images_dir, dest_name)
+        if (!file.exists(dest_path)) {
+          file.copy(src, dest_path, overwrite = FALSE, copy.mode = TRUE)
+        }
+        rel <- dest_name
+      } else {
+        rel <- copy_into_images(src, images_dir, slot, label = "", overwrite = FALSE)
+      }
+    } else {
+      rel <- relativize_image_path(images_dir, src)
+    }
+    slots_df <- update_slot_source(
+      slots_df, i, rel,
+      archive = TRUE,
+      reset_crop = TRUE,
+      images_dir = images_dir
+    )
+    assigned <- c(assigned, paste0(slot, " → ", rel))
+  }
+
+  list(
+    slots = slots_df,
+    n_assigned = length(assigned),
+    n_skipped_none = n_none,
+    n_skipped_multi = length(ambiguous),
+    assigned = assigned,
+    ambiguous = ambiguous
+  )
+}
+
 #' Copy a source file into images_dir as slot[_label].ext. Never writes under demos/.
 #' Returns relative path from images_dir.
 copy_into_images <- function(src_path, images_dir, slot, label = "", overwrite = FALSE) {

@@ -21,9 +21,12 @@ poster_assets/
 images/import/*
 !images/import/.gitkeep
 
-# Project archives (local snapshots)
-data/archives/*
-!data/archives/.gitkeep
+# Project archives (folder snapshots, not zipped)
+archive/*
+!archive/.gitkeep
+
+# Legacy path (if any)
+data/archives/
 
 # Keep demos; ignore other user photos at images root
 images/*

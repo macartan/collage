@@ -58,16 +58,31 @@ default_layout <- function(root = project_root()) {
     cropped = file.path(root, "cropped"),
     data = file.path(root, "data"),
     output = file.path(root, "output"),
+    archive = file.path(root, "archive"),
     profile = file.path(root, "data", "profile.csv"),
-    slots = file.path(root, "data", "slots.csv")
+    slots = file.path(root, "data", "slots.csv"),
+    archive_name = NA_character_,
+    archive_dir = NA_character_,
+    is_archive = FALSE
   )
 }
 
 ensure_project_dirs <- function(layout = default_layout()) {
-  for (d in c(layout$images, layout$demos, layout$import, layout$cropped, layout$data, layout$output)) {
-    if (!dir.exists(d)) dir.create(d, recursive = TRUE, showWarnings = FALSE)
+  dirs <- c(
+    layout$images, layout$demos, layout$import, layout$cropped,
+    layout$data, layout$output, layout$archive
+  )
+  for (d in dirs) {
+    if (!is.null(d) && !is.na(d) && nzchar(d) && !dir.exists(d)) {
+      dir.create(d, recursive = TRUE, showWarnings = FALSE)
+    }
   }
   invisible(layout)
+}
+
+#' TRUE if path is a single existing file.
+image_path_ok <- function(path) {
+  is.character(path) && length(path) == 1L && !is.na(path) && nzchar(path) && file.exists(path)
 }
 
 #' Join images_dir with a relative path stored in slots (e.g. demos/0801.jpg or 1205_vacation.jpg).

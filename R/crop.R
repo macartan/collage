@@ -24,12 +24,14 @@ crop_geometry <- function(b) {
 }
 
 read_source_image <- function(path) {
-  if (!is.character(path) || length(path) != 1L || !nzchar(path) || !file.exists(path)) {
-    stop("read_source_image: invalid or missing path.", call. = FALSE)
+  if (!image_path_ok(path)) {
+    stop("Image file missing or unreadable: ", if (length(path)) path else "(empty)", call. = FALSE)
   }
   suppressWarnings(tryCatch(
     image_read(path, strip = TRUE),
-    error = function(e) image_read(path)
+    error = function(e) {
+      stop("Could not read image: ", path, " — ", conditionMessage(e), call. = FALSE)
+    }
   ))
 }
 

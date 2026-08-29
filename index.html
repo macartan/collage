@@ -11,6 +11,8 @@
       --line: #e4e0d8;
       --bg: #f7f5f1;
       --card: #fff;
+      --link: #245b8a;
+      --toc-w: 13.5rem;
     }
     * { box-sizing: border-box; }
     body {
@@ -20,11 +22,44 @@
       background: var(--bg);
       line-height: 1.55;
     }
-    main {
-      max-width: 52rem;
+    .layout {
+      display: grid;
+      grid-template-columns: var(--toc-w) minmax(0, 52rem);
+      gap: 2rem;
+      max-width: calc(52rem + var(--toc-w) + 2rem);
       margin: 0 auto;
       padding: 2rem 1.25rem 3.5rem;
+      align-items: start;
     }
+    nav.toc {
+      position: sticky;
+      top: 1.25rem;
+      font-size: 0.88rem;
+      padding: 0.75rem 0;
+    }
+    nav.toc .toc-title {
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 0.6rem;
+    }
+    nav.toc ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      border-left: 2px solid var(--line);
+    }
+    nav.toc li { margin: 0; }
+    nav.toc a {
+      display: block;
+      padding: 0.28rem 0 0.28rem 0.75rem;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    nav.toc a:hover { color: var(--link); }
+    main { min-width: 0; }
     h1 {
       font-size: 2rem;
       font-weight: 700;
@@ -37,13 +72,20 @@
       margin: 0 0 1.25rem;
     }
     h2 {
-      font-size: 1.15rem;
-      margin: 1.75rem 0 0.6rem;
+      font-size: 1.2rem;
+      margin: 2rem 0 0.65rem;
+      padding-top: 0.35rem;
+      scroll-margin-top: 1rem;
+    }
+    h3 {
+      font-size: 1.05rem;
+      margin: 1.25rem 0 0.45rem;
+      scroll-margin-top: 1rem;
     }
     p { margin: 0.55rem 0; }
     ul, ol { margin: 0.4rem 0 0.8rem; padding-left: 1.25rem; }
     li { margin: 0.25rem 0; }
-    a { color: #245b8a; }
+    a { color: var(--link); }
     .hero {
       display: block;
       width: 70%;
@@ -68,6 +110,7 @@
       border-radius: 6px;
       overflow: hidden;
       font-size: 0.95rem;
+      margin: 0.75rem 0 1rem;
     }
     th, td {
       text-align: left;
@@ -84,13 +127,22 @@
       padding: 0.1em 0.35em;
       border-radius: 3px;
     }
+    pre {
+      background: #2b2b2b;
+      color: #f0f0f0;
+      padding: 0.9rem 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.88rem;
+    }
+    pre code { background: none; padding: 0; color: inherit; }
     .note {
       background: var(--card);
       border: 1px solid var(--line);
-      border-left: 4px solid #356096;
       border-radius: 6px;
-      padding: 0.85rem 1rem;
+      padding: 0.75rem 1rem;
       margin: 1rem 0;
+      font-size: 0.95rem;
     }
     footer {
       margin-top: 2.5rem;
@@ -99,78 +151,192 @@
       color: var(--muted);
       font-size: 0.9rem;
     }
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+        max-width: 52rem;
+      }
+      nav.toc {
+        position: static;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 1rem;
+        margin-bottom: 0.5rem;
+      }
+      nav.toc ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.15rem 0.75rem;
+        border-left: none;
+      }
+      nav.toc a { padding-left: 0; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <h1>Collage</h1>
-    <p class="sub">Month-by-month photo posters</p>
+  <div class="layout">
+    <nav class="toc" aria-label="Table of contents">
+      <p class="toc-title">On this page</p>
+      <ul>
+        <li><a href="#what-you-get">What you get</a></li>
+        <li><a href="#requirements">Requirements</a></li>
+        <li><a href="#default-grid">Default grid</a></li>
+        <li><a href="#quick-start">Quick start</a></li>
+        <li><a href="#smart-load">Smart load</a></li>
+        <li><a href="#using-the-app">Using the app</a></li>
+        <li><a href="#two-ways">Two ways to make a poster</a></li>
+        <li><a href="#archives">Archives</a></li>
+        <li><a href="#folder-map">Folder map</a></li>
+        <li><a href="#source">Source &amp; README</a></li>
+      </ul>
+    </nav>
 
-    <p>
-      <strong>Collage</strong> turns a folder of photos into a print-ready poster:
-      one picture per slot on a calendar-style grid.
-    </p>
-    <p>
-      Good for family timelines, project archives, “one photo per month” walls —
-      anything where the story is a grid over time.
-    </p>
+    <main>
+      <h1>Collage</h1>
+      <p class="sub">Month-by-month photo posters — user guide</p>
 
-    <img
-      class="hero"
-      src="assets/example.jpg"
-      alt="Example monthly photo collage poster"
-      width="1200"
-      height="800"
-    />
-    <p class="cap">Example output — your photos, your crops, same idea.</p>
+      <p><strong>Collage</strong> turns a folder of photos into a print-ready poster: one picture per slot on a calendar-style grid.</p>
+      <p>Good for family timelines, project archives, “one photo per month” walls — anything where the story is a grid over time.</p>
+      <p class="note">This page is the main guide. The repo <a href="README.md">README</a> is a short pointer; details live here: <a href="https://macartan.github.io/collage/">https://macartan.github.io/collage/</a>.</p>
 
-    <h2>What you get</h2>
-    <ul>
-      <li>A <strong>Shiny app</strong> (<code>app.R</code>) to assign photos to slots, crop them to squares, and generate a poster into <code>output/</code></li>
-      <li>Optional <code>poster.qmd</code> to fine-tune DPI, gaps, and labels without opening the app</li>
-      <li>Safe <strong>demo tiles</strong> under <code>images/demos/</code> so a fresh copy works before you add real photos</li>
-    </ul>
+      <img class="hero" src="assets/example.jpg" alt="Example monthly photo collage poster" width="700" height="900" />
+      <p class="cap">Example output — your photos, your crops, same idea.</p>
 
-    <h2>Default grid</h2>
-    <div class="note">
-      The starter layout is <strong>12 months × 19 years</strong>
-      (slots <code>0801</code> … <code>2612</code> — January 2008 through December 2026),
-      shown as a <strong>12-column × 19-row</strong> poster on A1 paper.
-      Change this in the app’s <strong>Setup</strong> tab (danger zone): rows, columns, gap, paper size,
-      and how slots are named (year–month calendar, row×column ids, or simple <code>1…n</code>).
-      Reshape <strong>resets</strong> slot data and can recreate demos for the new cells.
-    </div>
+      <h2 id="what-you-get">What you get</h2>
+      <ul>
+        <li>A <strong>Shiny app</strong> (<code>app.R</code>) to assign photos to slots, crop them to squares, and generate a poster into <code>output/</code></li>
+        <li>Optional <strong><code>poster.qmd</code></strong> to fine-tune DPI, gaps, and labels without opening the app</li>
+        <li>Safe <strong>demo tiles</strong> under <code>images/demos/</code> so a fresh copy works before you add real photos</li>
+        <li><strong>Archives</strong> under <code>archive/&lt;project_name&gt;/</code> so you can save a layout and start another without losing work</li>
+      </ul>
 
-    <h2>Quick start</h2>
-    <ol>
-      <li>Install R packages: <code>shiny</code>, <code>magick</code>, <code>base64enc</code></li>
-      <li>Open this folder in R / RStudio</li>
-      <li>If demos are missing: <code>source("assets/setup.R"); setup_collage(demo = TRUE)</code></li>
-      <li>Run the app: <code>shiny::runApp(".")</code></li>
-      <li>Put photos in <code>images/import/</code> (or pick files in <strong>Edit slot</strong>), crop, then <strong>Generate poster</strong></li>
-    </ol>
-    <p>Full walkthrough: see <a href="README.md">README.md</a>.</p>
+      <h2 id="requirements">Requirements</h2>
+      <ul>
+        <li><a href="https://cran.r-project.org/">R</a> (4.x recommended)</li>
+        <li>Packages:</li>
+      </ul>
+      <pre><code>install.packages(c("shiny", "magick", "base64enc"))</code></pre>
+      <p>For <code>poster.qmd</code>, <a href="https://quarto.org/">Quarto</a> (or Knit from RStudio) helps.</p>
 
-    <h2>Two ways to make the poster</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>In the app</th>
-          <th>Fine-tune separately</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Poster</strong> tab → Generate poster → <code>output/poster.jpg</code></td>
-          <td>Prep images in the app, then render <code>poster.qmd</code> for print control</td>
-        </tr>
-      </tbody>
-    </table>
+      <h2 id="default-grid">Default grid</h2>
+      <p>The starter layout is <strong>12 months × 19 years</strong> (slots <code>0801</code> … <code>2612</code> — January 2008 through December 2026), as a <strong>12-column × 19-row</strong> poster on A1 paper.</p>
+      <p>Change this in the app’s <strong>Setup</strong> tab (danger zone): rows, columns, gap, paper size, and how slots are named (year–month calendar, row×column ids, or simple <code>1…n</code>). Reshape <strong>resets</strong> slot data and can recreate demos for the new cells. Example for <strong>10 years from 2015</strong>: start <code>1501</code>, end <code>2412</code> → 10×12 with auto rows/cols.</p>
 
-    <footer>
-      Source for this page: <code>index.qmd</code> (re-render with Quarto when you edit it).
-      GitHub Pages can serve this <code>index.html</code> from the repository root.
-    </footer>
-  </main>
+      <h2 id="quick-start">Quick start</h2>
+      <ol>
+        <li>Install the R packages above.</li>
+        <li>Open this folder in R / RStudio.</li>
+        <li>If demos are missing: <code>source("assets/setup.R"); setup_collage(demo = TRUE)</code>.</li>
+        <li>Run the app: <code>shiny::runApp(".")</code>.</li>
+        <li><strong>Fast path with named files:</strong> put photos in <code>images/</code> (or <code>images/import/</code>) named for their slots — e.g. <code>1205.jpg</code> or <code>1205_vacation.jpg</code>.</li>
+        <li>On the <strong>Poster</strong> tab, click <strong>Smart load</strong> (use the <strong>?</strong> help beside it). It fills demo/blank slots when exactly one matching filename exists; no match or several matches leave that slot alone.</li>
+        <li>Crop any cells you care about, then <strong>Generate poster</strong> → <code>output/poster.jpg</code>.</li>
+      </ol>
+      <p>You can also assign photos one-by-one on <strong>Edit slot</strong> if names don’t match.</p>
+
+      <h2 id="smart-load">Smart load</h2>
+      <p>Smart load is the quickest way in when a folder of photos already uses slot names.</p>
+      <table>
+        <thead>
+          <tr><th>Situation</th><th>What happens</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Slot still on demo/blank fill, <strong>exactly one</strong> file matches (e.g. <code>1205</code> / <code>1205_trip.jpg</code>)</td>
+            <td>Assigned automatically</td>
+          </tr>
+          <tr>
+            <td><strong>No</strong> matching file</td>
+            <td>Slot unchanged</td>
+          </tr>
+          <tr>
+            <td><strong>Several</strong> matching files</td>
+            <td>Slot unchanged (ambiguous); listed in the status message</td>
+          </tr>
+          <tr>
+            <td>Slot already assigned by you</td>
+            <td>Never overwritten</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Matches are looked up in <code>images/</code> and <code>images/import/</code> (not inside <code>images/demos/</code>). Files in <code>import/</code> are copied into <code>images/</code> when assigned.</p>
+
+      <h2 id="using-the-app">Using the app</h2>
+
+      <h3 id="poster-tab">Poster tab</h3>
+      <ul>
+        <li>Grid preview — click a cell to edit it</li>
+        <li><strong>Generate poster</strong> — writes <code>output/poster.jpg</code> (or the open archive’s <code>output/</code>)</li>
+        <li><strong>Smart load</strong> — see above</li>
+        <li>Layout and images-folder path — saved in <code>data/profile.csv</code></li>
+      </ul>
+
+      <h3 id="edit-slot">Edit slot</h3>
+      <ul>
+        <li>Assign: keep current / blank / demo / choose new / restore previous</li>
+        <li>Crop: zoom, pan, rotate, optional saved size (px), then Save crop → <code>cropped/</code></li>
+      </ul>
+
+      <h3 id="setup">Setup (danger zone)</h3>
+      <ul>
+        <li>Restore defaults</li>
+        <li>Reshape grid / year range / naming scheme (resets live slot data)</li>
+        <li><strong>Archives</strong> — save, open in place, restore into live, or delete projects under <code>archive/&lt;name&gt;/</code></li>
+      </ul>
+
+      <h3 id="help-tab">Help tab</h3>
+      <p>Same orientation as this guide, inside the app.</p>
+
+      <h2 id="two-ways">Two ways to make the poster</h2>
+      <table>
+        <thead>
+          <tr><th>In the app</th><th>Fine-tune separately</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Poster</strong> tab → Generate poster → <code>output/poster.jpg</code></td>
+            <td>Prep in the app, then render <code>poster.qmd</code> for print control</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="archives">Archives</h2>
+      <p>Projects are stored as folders (not zip files):</p>
+      <pre><code>archive/my_project/
+  data/          # profile + slots
+  cropped/       # optional square crops
+  output/        # posters for this project
+  manifest.csv</code></pre>
+      <p>Photos under <code>images/</code> are <strong>shared</strong> and not copied into the archive. Open an archive to edit it in place, or restore it into the live workspace.</p>
+
+      <h2 id="folder-map">Folder map</h2>
+      <table>
+        <thead>
+          <tr><th>Path</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>app.R</code></td><td>Main app</td></tr>
+          <tr><td><code>poster.qmd</code></td><td>Optional high-control poster render</td></tr>
+          <tr><td><code>images/demos/</code></td><td>Demo tiles + <code>blank.jpg</code></td></tr>
+          <tr><td><code>images/import/</code></td><td>Drop zone</td></tr>
+          <tr><td><code>images/</code></td><td>Your assigned photos (<code>1205_label.jpg</code>)</td></tr>
+          <tr><td><code>cropped/</code></td><td>Square crops when saved</td></tr>
+          <tr><td><code>data/</code></td><td>Live profile + slots</td></tr>
+          <tr><td><code>archive/</code></td><td>Saved projects</td></tr>
+          <tr><td><code>output/</code></td><td>Live poster output</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="source">Source &amp; README</h2>
+      <ul>
+        <li>Live guide (this page): <a href="https://macartan.github.io/collage/">https://macartan.github.io/collage/</a></li>
+        <li>Repository notes: <a href="README.md">README.md</a></li>
+      </ul>
+      <p>Source for this page: <code>index.qmd</code>. If Quarto is installed, <code>quarto render index.qmd</code> refreshes <code>index.html</code>; otherwise keep them in sync by hand.</p>
+
+      <footer>
+        Collage — open the folder in R and run <code>shiny::runApp(".")</code>
+      </footer>
+    </main>
+  </div>
 </body>
 </html>

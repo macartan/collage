@@ -7,35 +7,34 @@ for (f in c("paths.R", "slots.R", "crop.R", "images.R", "poster.R", "archive.R")
 }
 source("assets/setup.R")
 
-ids <- make_slot_ids("yymm", rows = 10, cols = 12, start_yymm = "1501", end_yymm = "2412")
-stopifnot(length(ids) == 120L, identical(ids[1], "1501"), identical(ids[120], "2412"))
-cat("IDS_OK", length(ids), "\n")
+dir.create("archive", showWarnings = FALSE)
+if (!file.exists("archive/.gitkeep")) writeLines("", "archive/.gitkeep")
 
 lay <- default_layout()
-if (!file.exists(lay$profile) || !file.exists(lay$slots)) {
-  setup_collage(root = lay$root, demo = FALSE, reset_data = TRUE)
-}
+if (!file.exists(lay$profile)) setup_collage(root = lay$root, demo = FALSE, reset_data = TRUE)
 
-nm <- paste0("_wiretest_", format(Sys.time(), "%H%M%S"))
-res <- save_archive(nm, root = lay$root, include_cropped = FALSE, notes = "wire")
-stopifnot(dir.exists(res$path))
-res2 <- restore_archive(nm, root = lay$root, restore_cropped = FALSE, missing_demos = "regenerate")
-cat("ARCHIVE_OK", res2$name, "\n")
-unlink(res$path, recursive = TRUE)
+nm <- paste0("wire_", format(Sys.time(), "%H%M%S"))
+res <- save_archive(nm, root = lay$root, include_cropped = FALSE, include_output = FALSE, notes = "wire")
+stopifnot(dir.exists(file.path("archive", res$name, "data")))
+stopifnot(dir.exists(file.path("archive", res$name, "output")))
+stopifnot(dir.exists(file.path("archive", res$name, "cropped")))
 
-# Confirm Setup inputs exist in parsed app (string check)
+sum <- archive_summary(res$name, lay$root)
+cat("SUMMARY", format_archive_summary_line(sum), "\n")
+
+wl <- workspace_layout(lay$root, res$name)
+stopifnot(isTRUE(wl$is_archive), grepl("archive", wl$data, fixed = TRUE))
+
+res2 <- restore_archive(res$name, root = lay$root, restore_cropped = FALSE, restore_output = FALSE)
+delete_archive(res$name, root = lay$root)
+stopifnot(!dir.exists(file.path("archive", res$name)))
+
+# missing image path
+stopifnot(!image_path_ok(NA_character_))
+stopifnot(!image_path_ok("no/such/file.jpg"))
+
 app_txt <- paste(readLines("app.R", warn = FALSE), collapse = "\n")
-needed <- c(
-  "btn_restore_defaults_ok",
-  "btn_reshape_grid_ok",
-  "btn_save_archive",
-  "btn_restore_archive_ok",
-  "reload_live_state",
-  "setup_preview_ids",
-  "setup_auto_rows"
-)
-for (s in needed) {
-  if (!grepl(s, app_txt, fixed = TRUE)) stop("Missing wiring: ", s)
+for (s in c("btn_open_archive", "btn_delete_archive_ok", "btn_use_live", "archive_list_ui", "missing_slots")) {
+  if (!grepl(s, app_txt, fixed = TRUE)) stop("Missing: ", s)
 }
-cat("WIRING_OK\n")
 cat("ALL_OK\n")

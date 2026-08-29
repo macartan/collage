@@ -2,6 +2,8 @@
 
 Build a **month-by-month photo poster** from a folder of pictures. Assign each photo to a calendar slot, crop it to a square, then generate a print-ready poster.
 
+**Full guide (with TOC):** <https://macartan.github.io/collage/>
+
 Good for family timelines, project archives, “one photo per month” walls — anything where the story is a grid over time.
 
 ---
@@ -43,9 +45,11 @@ setup_collage(demo = TRUE)
 
 ## Walkthrough
 
+For the longer guide (Smart load, Setup, archives, folder map), see the [live site](https://macartan.github.io/collage/). Short version:
+
 ### 1. Put photos in
 
-Drop files into `images/import/` (any names), or pick a file from your computer inside the app.
+Drop files into `images/import/` (any names), or name them for slots (`1205.jpg` / `1205_vacation.jpg`) in `images/` and use **Smart load** on the Poster tab.
 
 ### 2. Open the app
 
@@ -56,7 +60,7 @@ Or in R:
 shiny::runApp(".")
 ```
 
-Start on the **Poster** tab. A short greeting pops up once; **Help** (last tab) has the full walkthrough anytime.
+Start on the **Poster** tab. A short greeting pops up once; **Help** (last tab) has the walkthrough anytime.
 
 ### 3. Assign & crop
 
@@ -86,7 +90,7 @@ On the **Setup** tab (danger zone):
 
 - **Restore defaults** — back to 19×12 / `0801`–`2612` with fresh demos  
 - **Reshape grid** — change rows/cols, gap, paper, and slot naming. For a **10-year** calendar: start `1501`, end `2412`, leave auto rows/cols on (becomes 10×12), recreate demos  
-- **Archive** — save `data/` (+ optional `cropped/`) under `data/archives/<name>/` without copying `images/`; load later to continue. Keep your photos in `images/`
+- **Archive** — projects live under `archive/<name>/` with `data/`, `cropped/`, and `output/` (photos in `images/` are shared, not copied). From Setup you can save, open in place, restore into live, or delete.
 
 Reshape and restore **replace** live slot data — archive first if you care about the current project.
 
@@ -104,6 +108,7 @@ Reshape and restore **replace** live slot data — archive first if you care abo
 | `cropped/` | Square crops used when a slot is marked cropped |
 | `data/profile.csv` | Images folder path + layout (rows, cols, paper, dpi) |
 | `data/slots.csv` | Slot ↔ file map, crop settings, one backup |
+| `archive/` | Saved projects |
 | `output/` | Generated poster |
 
 You can point the app at another images folder on the Poster tab; that path is saved in the profile.
@@ -122,3 +127,5 @@ This folder is meant to be its own git repository. Typical flow:
 4. Commit *your* `data/` and `images/` if you want versioned layouts (keep large originals out of git if needed — see `.gitignore`)
 
 Demo JPEGs are small and included so a fresh clone works immediately.
+
+Docs: <https://macartan.github.io/collage/>

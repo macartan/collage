@@ -22,19 +22,28 @@ source(file.path(app_root, "assets", "setup.R"), local = FALSE)
 
 layout0 <- default_layout(app_root)
 ensure_project_dirs(layout0)
-dir.create(file.path(layout0$data, "archives"), recursive = TRUE, showWarnings = FALSE)
-keep_arch <- file.path(layout0$data, "archives", ".gitkeep")
+keep_arch <- file.path(layout0$archive, ".gitkeep")
 if (!file.exists(keep_arch)) writeLines("", keep_arch)
 
 MAX_PREVIEW <- 900L
 
-load_state <- function(root = app_root) {
-  lay <- default_layout(root)
-  ensure_project_dirs(lay)
+load_state <- function(root = app_root, archive_name = NULL) {
+  lay <- workspace_layout(root, archive_name)
+  if (isTRUE(lay$is_archive)) {
+    if (!dir.exists(lay$archive_dir)) {
+      stop("Archive not found: ", archive_name, call. = FALSE)
+    }
+    ensure_archive_dirs(lay$archive_dir)
+  } else {
+    ensure_project_dirs(lay)
+  }
   if (!file.exists(lay$profile) || !file.exists(lay$slots)) {
-    # Auto-bootstrap data (no demos) so the app always opens
+    if (isTRUE(lay$is_archive)) {
+      stop("Archive is incomplete (missing data/profile.csv or data/slots.csv).", call. = FALSE)
+    }
     source(file.path(root, "assets", "setup.R"), local = TRUE)
     setup_collage(root = root, demo = FALSE)
+    lay <- workspace_layout(root, NULL)
   }
   profile <- read_profile(lay$profile, root = root)
   img <- profile$images_dir
@@ -136,7 +145,23 @@ ui <- fluidPage(
             actionButton("btn_make_poster", "Generate poster", class = "btn-primary", width = "100%"),
             checkboxInput("chk_pdf", "Also save PDF", value = FALSE),
             div(class = "muted", style = "margin-top:8px;", "Saves to ", tags$code("output/")),
-            textOutput("poster_msg")
+            textOutput("poster_msg"),
+            tags$hr(style = "margin:12px 0;"),
+            div(
+              style = "display:flex; align-items:center; gap:8px;",
+              actionButton("btn_smart_load", "Smart load", class = "btn-success", style = "flex:1;"),
+              actionButton(
+                "btn_smart_load_help",
+                label = NULL,
+                icon = icon("circle-question"),
+                class = "btn-default btn-sm",
+                title = "What is Smart load?",
+                style = "min-width:36px;"
+              )
+            ),
+            div(class = "muted", style = "margin-top:6px;",
+                "Fill demo slots from matching filenames in ", tags$code("images/"), "."),
+            textOutput("smart_load_msg")
           ),
           div(
             class = "panel-card",
@@ -426,47 +451,55 @@ ui <- fluidPage(
       br(),
       div(
         class = "panel-card",
-        div(class = "panel-h", "3 · Archive / reload project"),
+        div(class = "panel-h", "3 · Archives"),
         tags$p(
-          "Save a lightweight snapshot of ", tags$code("data/"),
-          " (and optionally ", tags$code("cropped/"),
-          ") so you can start a new grid without losing the old one. ",
-          tags$strong("Photos in "), tags$code("images/"),
-          tags$strong(" are not copied"),
-          " — keep those files in place. Missing demos are recreated on reload."
+          "Archives live in ", tags$code("archive/<project_name>/"),
+          " (not zipped): ", tags$code("data/"), ", ", tags$code("cropped/"),
+          ", and ", tags$code("output/"),
+          ". Photos in ", tags$code("images/"), " are shared and not copied."
         ),
+        uiOutput("archive_list_ui"),
+        br(),
         fluidRow(
           column(
             4,
             textInput("archive_name", "New archive name", value = "", placeholder = "e.g. family_2010_2020"),
             textInput("archive_notes", "Notes (optional)", value = ""),
-            checkboxInput("archive_include_cropped", "Include cropped/ copies", value = TRUE),
-            actionButton("btn_save_archive", "Save archive", class = "btn-primary", width = "100%"),
+            checkboxInput("archive_include_cropped", "Include cropped/", value = TRUE),
+            checkboxInput("archive_include_output", "Include output/ (posters)", value = TRUE),
+            actionButton("btn_save_archive", "Save current → archive", class = "btn-primary", width = "100%"),
             div(style = "margin-top:8px;", textOutput("archive_save_msg"))
           ),
           column(
             4,
-            selectInput("archive_pick", "Existing archives", choices = c("(none)" = ""), width = "100%"),
-            actionButton("btn_refresh_archives", "Refresh list", class = "btn-default btn-sm"),
-            checkboxInput("archive_restore_cropped", "Restore cropped/ from archive", value = TRUE),
+            selectInput("archive_pick", "Select archive", choices = c("(none)" = ""), width = "100%"),
+            actionButton("btn_refresh_archives", "Refresh list", class = "btn-default btn-sm", width = "100%"),
+            br(), br(),
+            checkboxInput("archive_restore_cropped", "When restoring: copy cropped/", value = TRUE),
+            checkboxInput("archive_restore_output", "When restoring: copy output/", value = TRUE),
             radioButtons(
               "archive_missing_demos",
-              "If a demo tile is missing",
-              choices = c("Regenerate color demos" = "regenerate", "Use blank.jpg" = "blank"),
+              "Missing demos on restore/open",
+              choices = c("Regenerate" = "regenerate", "Use blank.jpg" = "blank"),
               selected = "regenerate"
             ),
-            actionButton("btn_restore_archive", "Load archive…", class = "btn-warning", width = "100%"),
+            actionButton("btn_open_archive", "Open archive (edit in place)", class = "btn-info", width = "100%"),
+            actionButton("btn_restore_archive", "Restore into live workspace…", class = "btn-warning", width = "100%", style = "margin-top:6px;"),
+            actionButton("btn_use_live", "Back to live workspace", class = "btn-default", width = "100%", style = "margin-top:6px;"),
+            actionButton("btn_delete_archive", "Delete archive…", class = "btn-danger", width = "100%", style = "margin-top:6px;"),
             div(style = "margin-top:8px;", textOutput("archive_load_msg"))
           ),
           column(
             4,
-            div(class = "muted", uiOutput("archive_detail_ui")),
+            div(uiOutput("archive_detail_ui")),
             tags$hr(),
             tags$p(
               class = "muted",
-              "Typical flow: ", tags$strong("Save archive"),
-              " → reshape or restore defaults for a new project → later ",
-              tags$strong("Load archive"), " to continue the old one."
+              tags$strong("Open"), " reads/writes that archive folder directly. ",
+              tags$strong("Restore"), " copies it into the live ", tags$code("data/"),
+              " / ", tags$code("cropped/"), " / ", tags$code("output/"), ". ",
+              "Generate poster while an archive is open → saves under that archive’s ",
+              tags$code("output/"), "."
             )
           )
         )
@@ -484,11 +517,15 @@ ui <- fluidPage(
         ),
         tags$h3("Quick start"),
         tags$ol(
-          tags$li(tags$strong("Add photos"), " — drop files into ", tags$code("images/import/"),
-                  ", or pick any file when you assign a slot."),
-          tags$li(tags$strong("Edit slot"), " — choose a month, set the image (current / blank / demo / new / restore), then zoom, pan, rotate and Save crop."),
-          tags$li(tags$strong("Poster"), " — generate from the Poster tab, or render ", tags$code("poster.qmd"), " separately."),
-          tags$li(tags$strong("Setup"), " — danger zone to restore defaults or reshape the grid (resets data).")
+          tags$li(tags$strong("Add photos"), " — drop files into ", tags$code("images/"),
+                  " or ", tags$code("images/import/"),
+                  " named for their slots (e.g. ", tags$code("1205.jpg"), " or ",
+                  tags$code("1205_vacation.jpg"), ")."),
+          tags$li(tags$strong("Smart load"), " — on the Poster tab, click ", tags$strong("Smart load"),
+                  " (use the ", tags$strong("?"), " help beside it). It finds slots still on demo/blank fill and, when exactly one matching filename exists, assigns it. No match or several matches → that slot is left alone."),
+          tags$li(tags$strong("Edit slot"), " — fine-tune any cell (blank / demo / new / restore), then crop."),
+          tags$li(tags$strong("Poster"), " — Generate poster, or render ", tags$code("poster.qmd"), " separately."),
+          tags$li(tags$strong("Setup"), " — reshape the year range / grid, or archive projects.")
         ),
         div(
           class = "two-ways",
@@ -515,6 +552,8 @@ ui <- fluidPage(
         tags$h3("Tips"),
         tags$ul(
           tags$li("Demo tiles in ", tags$code("images/demos/"), " are safe placeholders — the app never overwrites them during normal editing."),
+          tags$li(tags$strong("Smart load"), " only changes slots that still point at ", tags$code("demos/"),
+                  "; unique matches win, zero or many matches are skipped."),
           tags$li("New photos are copied into ", tags$code("images/"), " as names like ",
                   tags$code("1205.jpg"), " or ", tags$code("1205_vacation.jpg"), "."),
           tags$li("Choosing a new image keeps one backup so you can Restore once."),
@@ -540,6 +579,7 @@ server <- function(input, output, session) {
     S0 = NA_real_,
     assign_msg = "",
     poster_msg = "",
+    smart_load_msg = "",
     grid_nonce = 0L,
     setup_restore_msg = "",
     setup_reshape_msg = "",
@@ -598,10 +638,17 @@ server <- function(input, output, session) {
 
   output$status_summary_ui <- renderUI({
     s <- slot_status_summary(rv$slots, images_dir(), cropped_dir())
+    ws <- if (isTRUE(rv$layout$is_archive)) {
+      paste0("Archive: ", rv$layout$archive_name)
+    } else {
+      "Live workspace"
+    }
     div(
       class = "status-line",
+      tags$span(ws),
+      " · ",
       sprintf(
-        "Slots %d · files present %d · using demos %d · blank %d · cropped %d",
+        "Slots %d · files present %d · demos %d · blank %d · cropped %d",
         s$n, s$filled, s$demo, s$blank, s$cropped
       )
     )
@@ -846,11 +893,18 @@ server <- function(input, output, session) {
 
   output$preview_plot <- renderPlot({
     p <- current_src_path()
-    if (is.na(p) || !file.exists(p) || is.na(rv$S0)) {
+    if (!image_path_ok(p) || is.na(rv$S0)) {
       plot.new()
-      text(0.5, 0.5, "No image for this slot", col = "white", cex = 1.4)
+      msg <- if (!image_path_ok(p)) {
+        paste0("Missing image\n", current_row()$file_name[[1L]])
+      } else {
+        "No image for this slot"
+      }
+      text(0.5, 0.5, msg, col = "white", cex = 1.2)
       return(invisible(NULL))
     }
+    ok <- TRUE
+    err <- NULL
     mag <- if (is.null(input$mag_pct)) 100 else input$mag_pct
     sx_pct <- if (is.null(input$shift_x_pct)) 0 else input$shift_x_pct
     sy_pct <- if (is.null(input$shift_y_pct)) 0 else input$shift_y_pct
@@ -859,14 +913,27 @@ server <- function(input, output, session) {
     S0 <- rv$S0
     shift <- shift_px_from_pct(sx_pct, sy_pct, w, h)
     b <- crop_bounds(w, h, S0, mag, shift$sx, shift$sy)
-    im <- read_edit_image(p, rotate_cw = rv$rot_cw)
-    im <- image_crop(im, crop_geometry(b))
-    disp <- min(MAX_PREVIEW, max(64L, as.integer(S0)))
-    im <- image_resize(im, sprintf("%dx%d!", disp, disp))
+    im <- tryCatch(
+      {
+        im0 <- read_edit_image(p, rotate_cw = rv$rot_cw)
+        im0 <- image_crop(im0, crop_geometry(b))
+        disp <- min(MAX_PREVIEW, max(64L, as.integer(S0)))
+        image_resize(im0, sprintf("%dx%d!", disp, disp))
+      },
+      error = function(e) {
+        ok <<- FALSE
+        err <<- conditionMessage(e)
+        NULL
+      }
+    )
     par(mar = c(0, 0, 0, 0), bg = "black", pty = "s")
     plot.new()
     plot.window(xlim = c(0, 1), ylim = c(0, 1), asp = 1, xaxs = "i", yaxs = "i")
-    rasterImage(as.raster(im), 0, 0, 1, 1, interpolate = FALSE)
+    if (is.null(im)) {
+      text(0.5, 0.5, paste0("Could not load image\n", err), col = "white", cex = 1.1)
+    } else {
+      rasterImage(as.raster(im), 0, 0, 1, 1, interpolate = FALSE)
+    }
   })
 
   observeEvent(input$btn_save_crop, {
@@ -1133,6 +1200,69 @@ server <- function(input, output, session) {
   })
 
   output$poster_msg <- renderText(rv$poster_msg)
+  output$smart_load_msg <- renderText(rv$smart_load_msg)
+
+  observeEvent(input$btn_smart_load_help, {
+    showModal(modalDialog(
+      title = "Smart load",
+      easyClose = TRUE,
+      footer = modalButton("Got it"),
+      tags$p(
+        "Smart load gives you a head start when photos are already named for their slots."
+      ),
+      tags$ol(
+        tags$li("It only looks at slots still on the ", tags$strong("default fill"),
+                " (anything under ", tags$code("demos/"), ", including blank)."),
+        tags$li("In ", tags$code("images/"), " and ", tags$code("images/import/"),
+                ", it looks for filenames that start with that slot id — e.g. slot ",
+                tags$code("1205"), " matches ", tags$code("1205.jpg"), " or ",
+                tags$code("1205_vacation.jpg"), "."),
+        tags$li(tags$strong("Exactly one match"), " → that image is assigned (import files are copied into ",
+                tags$code("images/"), ")."),
+        tags$li(tags$strong("No match"), " → slot unchanged."),
+        tags$li(tags$strong("Several matches"), " → slot unchanged (ambiguous); reported in the status message.")
+      ),
+      tags$p(
+        class = "muted",
+        "Slots you already assigned manually are never overwritten. Safe to run more than once."
+      )
+    ))
+  })
+
+  observeEvent(input$btn_smart_load, {
+    tryCatch(
+      {
+        res <- smart_load_slots(rv$slots, images_dir())
+        rv$slots <- res$slots
+        persist_slots()
+        sync_slot_selectors()
+        if (nrow(rv$slots) >= 1L) sync_crop_inputs()
+        rv$grid_nonce <- rv$grid_nonce + 1L
+
+        msg <- sprintf(
+          "Smart load: %d assigned · %d demo slots with no match · %d ambiguous (skipped).",
+          res$n_assigned, res$n_skipped_none, res$n_skipped_multi
+        )
+        if (res$n_skipped_multi > 0 && length(res$ambiguous) > 0) {
+          amb <- names(res$ambiguous)
+          if (length(amb) > 8) amb <- c(head(amb, 8), "…")
+          msg <- paste0(msg, " Ambiguous slots: ", paste(amb, collapse = ", "), ".")
+        }
+        if (res$n_assigned == 0L && res$n_skipped_multi == 0L) {
+          msg <- paste0(
+            msg,
+            " Tip: put files like 1205.jpg in images/ (or import/), then try again."
+          )
+        }
+        rv$smart_load_msg <- msg
+        showNotification(msg, type = if (res$n_assigned > 0) "message" else "warning", duration = 10)
+      },
+      error = function(e) {
+        rv$smart_load_msg <- conditionMessage(e)
+        showNotification(rv$smart_load_msg, type = "error", duration = NULL)
+      }
+    )
+  })
 
   observeEvent(input$btn_make_poster, {
     rows <- max(1L, as.integer(input$grid_rows))
@@ -1158,7 +1288,29 @@ server <- function(input, output, session) {
           )
           msg <- paste0("Saved ", basename(res$jpg))
           if (!is.na(res$pdf) && nzchar(res$pdf)) msg <- paste0(msg, " and ", basename(res$pdf))
-          msg <- paste0(msg, " in output/")
+          out_label <- if (isTRUE(rv$layout$is_archive)) {
+            paste0("archive/", rv$layout$archive_name, "/output/")
+          } else {
+            "output/"
+          }
+          msg <- paste0(msg, " in ", out_label)
+          if (length(res$missing_slots) > 0) {
+            miss <- res$missing_slots
+            if (length(miss) > 12) {
+              miss_txt <- paste0(paste(head(miss, 12), collapse = ", "), " … +", length(miss) - 12, " more")
+            } else {
+              miss_txt <- paste(miss, collapse = ", ")
+            }
+            msg <- paste0(
+              msg, " — ", length(res$missing_slots),
+              " slot(s) skipped (missing image/crop): ", miss_txt
+            )
+            showNotification(
+              paste0(length(res$missing_slots), " slot(s) had missing files and were left blank."),
+              type = "warning",
+              duration = 10
+            )
+          }
           rv$poster_msg <- msg
           showNotification(msg, type = "message", duration = 8)
         },
@@ -1176,8 +1328,8 @@ server <- function(input, output, session) {
   })
 
   # ---- Setup / archive (danger zone) ----
-  reload_live_state <- function() {
-    st <- load_state(app_root)
+  reload_live_state <- function(archive_name = NULL) {
+    st <- load_state(app_root, archive_name = archive_name)
     rv$layout <- st$layout
     rv$profile <- st$profile
     rv$slots <- st$slots
@@ -1205,19 +1357,41 @@ server <- function(input, output, session) {
   }
 
   refresh_archive_choices <- function() {
-    rv$archive_nonce
-    names <- list_archives(rv$layout)
+    names <- list_archives(app_root)
     if (length(names) == 0) {
       updateSelectInput(session, "archive_pick", choices = c("(none)" = ""), selected = "")
     } else {
-      updateSelectInput(session, "archive_pick", choices = c("(none)" = "", setNames(names, names)))
+      labels <- vapply(names, function(nm) {
+        format_archive_summary_line(archive_summary(nm, app_root))
+      }, character(1))
+      updateSelectInput(session, "archive_pick", choices = c("(none)" = "", setNames(names, labels)))
     }
   }
 
   observe({
+    rv$archive_nonce
     refresh_archive_choices()
   })
-  observeEvent(input$btn_refresh_archives, refresh_archive_choices())
+  observeEvent(input$btn_refresh_archives, {
+    rv$archive_nonce <- rv$archive_nonce + 1L
+    refresh_archive_choices()
+  })
+
+  output$archive_list_ui <- renderUI({
+    rv$archive_nonce
+    names <- list_archives(app_root)
+    if (length(names) == 0) {
+      return(div(class = "muted", "No archives yet. Save the current project below → ", tags$code("archive/<name>/"), "."))
+    }
+    rows <- lapply(names, function(nm) {
+      s <- archive_summary(nm, app_root)
+      tags$li(format_archive_summary_line(s))
+    })
+    tagList(
+      tags$strong("Saved projects"),
+      tags$ul(style = "margin-top:6px;", rows)
+    )
+  })
 
   # Auto rows/cols from YYMM range (e.g. 10 years → 10×12)
   observeEvent(
@@ -1271,20 +1445,23 @@ server <- function(input, output, session) {
     rv$archive_nonce
     nm <- input$archive_pick
     if (is.null(nm) || !nzchar(nm)) {
-      return(tags$span("Pick an archive to see details."))
+      return(div(class = "muted", "Pick an archive for details."))
     }
-    adir <- file.path(archives_root(rv$layout), nm)
-    if (!dir.exists(adir)) return(tags$span("Archive folder missing."))
-    man <- read_archive_manifest(adir)
-    tags$div(
-      tags$div(tags$strong(if (is.null(man$name) || is.na(man$name)) nm else man$name)),
-      tags$div(class = "muted", "Created: ",
-               if (is.null(man$created) || is.na(man$created)) "?" else man$created),
-      tags$div(class = "muted", "Cropped saved: ",
-               if (isTRUE(as.logical(man$includes_cropped))) "yes" else "no"),
-      if (!is.null(man$notes) && !is.na(man$notes) && nzchar(as.character(man$notes))) {
-        tags$div(class = "muted", "Notes: ", man$notes)
-      }
+    s <- tryCatch(archive_summary(nm, app_root), error = function(e) NULL)
+    if (is.null(s)) return(div(class = "meta-warn", "Could not read archive."))
+    div(
+      class = "meta-box",
+      tags$div(tags$strong(s$name)),
+      tags$div(class = "muted", "Created: ", if (is.na(s$created)) "?" else s$created),
+      tags$div(class = "muted",
+               sprintf("Grid %s · %s slots · %s",
+                       if (!is.na(s$rows)) paste0(s$rows, "×", s$cols) else "?",
+                       if (!is.na(s$n_slots)) s$n_slots else "?",
+                       if (!is.null(s$slot_scheme) && !is.na(s$slot_scheme)) s$slot_scheme else "?")),
+      tags$div(class = "muted", "Cropped files: ", s$n_cropped,
+               if (isTRUE(s$has_poster)) " · poster present" else " · no poster yet"),
+      tags$div(class = "muted", tags$code(paste0("archive/", s$name, "/"))),
+      if (nzchar(s$notes)) tags$div(class = "muted", "Notes: ", s$notes)
     )
   })
 
@@ -1296,11 +1473,10 @@ server <- function(input, output, session) {
         modalButton("Cancel"),
         actionButton("btn_restore_defaults_ok", "Yes, reset everything", class = "btn-danger")
       ),
-      tags$p("This replaces ", tags$code("data/profile.csv"), " and ", tags$code("data/slots.csv"),
-             " with the starter 19×12 / 0801–2612 layout, clears ", tags$code("cropped/"),
-             ", and recreates demos."),
-      tags$p(tags$strong("Your photos in images/ are not deleted."),
-             " Assignments and crop settings are lost unless you archived first.")
+      tags$p("This replaces live ", tags$code("data/"), " with the starter 19×12 / 0801–2612 layout, clears ",
+             tags$code("cropped/"), ", and recreates demos."),
+      tags$p(tags$strong("Photos in images/ are not deleted."),
+             " Archive first if you need the current project.")
     ))
   })
 
@@ -1311,8 +1487,8 @@ server <- function(input, output, session) {
         {
           restore_collage_defaults(root = app_root, demo = TRUE)
           setProgress(0.8)
-          reload_live_state()
-          rv$setup_restore_msg <- "Restored defaults (19×12, 0801–2612) and rebuilt demos."
+          reload_live_state(NULL)
+          rv$setup_restore_msg <- "Restored live defaults (19×12, 0801–2612) and rebuilt demos."
           showNotification(rv$setup_restore_msg, type = "message")
         },
         error = function(e) {
@@ -1337,12 +1513,9 @@ server <- function(input, output, session) {
         modalButton("Cancel"),
         actionButton("btn_reshape_grid_ok", "Yes, reshape and reset data", class = "btn-danger")
       ),
-      tags$p(
-        sprintf("New grid: %d × %d (%d slots), scheme “%s”.", rows, cols, n, scheme)
-      ),
+      tags$p(sprintf("New grid: %d × %d (%d slots), scheme “%s”.", rows, cols, n, scheme)),
       if (identical(scheme, "yymm")) tags$p(sprintf("Year–month range: %s … %s", start, end)),
-      tags$p(tags$strong("All slot assignments and crop settings will be replaced.")),
-      tags$p("Archive first if you want to come back to the current project.")
+      tags$p(tags$strong("Applies to the live workspace."), " Archive first if needed.")
     ))
   })
 
@@ -1351,6 +1524,7 @@ server <- function(input, output, session) {
     withProgress(message = "Reshaping grid…", value = 0.2, {
       tryCatch(
         {
+          # Reshape always targets live workspace
           reshape_collage(
             root = app_root,
             rows = as.integer(input$setup_rows),
@@ -1366,9 +1540,9 @@ server <- function(input, output, session) {
             clear_cropped = isTRUE(input$setup_clear_cropped)
           )
           setProgress(0.85)
-          reload_live_state()
+          reload_live_state(NULL)
           rv$setup_reshape_msg <- sprintf(
-            "Reshaped to %d×%d (%s). %d slots.",
+            "Reshaped live workspace to %d×%d (%s). %d slots.",
             rv$profile$rows, rv$profile$cols, rv$profile$slot_scheme, nrow(rv$slots)
           )
           showNotification(rv$setup_reshape_msg, type = "message")
@@ -1390,19 +1564,55 @@ server <- function(input, output, session) {
     }
     tryCatch(
       {
-        # Persist current in-memory edits first
         persist_slots()
         persist_profile()
-        res <- save_archive(
-          name = nm,
-          root = app_root,
-          include_cropped = isTRUE(input$archive_include_cropped),
-          notes = input$archive_notes
-        )
+        # Always snapshot from live layout paths — if currently in an archive, save that archive's files under a new name via copying layout dirs
+        res <- if (isTRUE(rv$layout$is_archive)) {
+          # Copy current archive workspace to a new archive name
+          src_lay <- rv$layout
+          dest <- archive_dir(nm, app_root)
+          if (dir.exists(dest)) stop("Archive already exists: ", nm, call. = FALSE)
+          ensure_archive_dirs(dest)
+          file.copy(src_lay$profile, file.path(dest, "data", "profile.csv"), overwrite = TRUE)
+          file.copy(src_lay$slots, file.path(dest, "data", "slots.csv"), overwrite = TRUE)
+          n_crop <- if (isTRUE(input$archive_include_cropped)) {
+            copy_dir_images(src_lay$cropped, file.path(dest, "cropped"))
+          } else {
+            0L
+          }
+          n_out <- if (isTRUE(input$archive_include_output)) {
+            copy_dir_images(src_lay$output, file.path(dest, "output"))
+          } else {
+            0L
+          }
+          man <- data.frame(
+            name = sanitize_archive_name(nm),
+            created = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+            notes = as.character(input$archive_notes),
+            includes_cropped = isTRUE(input$archive_include_cropped),
+            n_cropped_files = n_crop,
+            n_output_files = n_out,
+            n_slots = nrow(rv$slots),
+            rows = rv$profile$rows,
+            cols = rv$profile$cols,
+            slot_scheme = rv$profile$slot_scheme,
+            has_poster = file.exists(file.path(dest, "output", "poster.jpg")),
+            stringsAsFactors = FALSE
+          )
+          write.csv(man, file.path(dest, "manifest.csv"), row.names = FALSE)
+          list(path = dest, name = sanitize_archive_name(nm), n_cropped = n_crop, n_output = n_out)
+        } else {
+          save_archive(
+            name = nm,
+            root = app_root,
+            include_cropped = isTRUE(input$archive_include_cropped),
+            include_output = isTRUE(input$archive_include_output),
+            notes = input$archive_notes
+          )
+        }
         rv$archive_save_msg <- sprintf(
-          "Saved archive “%s”%s.",
-          res$name,
-          if (res$n_cropped > 0) paste0(" with ", res$n_cropped, " crop file(s)") else ""
+          "Saved archive/%s/ (crops %d, output files %d).",
+          res$name, res$n_cropped, if (is.null(res$n_output)) 0L else res$n_output
         )
         rv$archive_nonce <- rv$archive_nonce + 1L
         refresh_archive_choices()
@@ -1417,44 +1627,81 @@ server <- function(input, output, session) {
     )
   })
 
+  observeEvent(input$btn_open_archive, {
+    nm <- input$archive_pick
+    if (is.null(nm) || !nzchar(nm)) {
+      showNotification("Pick an archive to open.", type = "error")
+      return(invisible(NULL))
+    }
+    tryCatch(
+      {
+        reload_live_state(nm)
+        if (identical(input$archive_missing_demos, "regenerate")) {
+          ensure_demos_for_slots(rv$slots, rv$layout)
+        }
+        rv$archive_load_msg <- paste0("Opened archive/", nm, "/ (edit in place).")
+        showNotification(rv$archive_load_msg, type = "message")
+        updateTabsetPanel(session, "tabs", selected = "Poster")
+      },
+      error = function(e) {
+        rv$archive_load_msg <- conditionMessage(e)
+        showNotification(rv$archive_load_msg, type = "error", duration = NULL)
+      }
+    )
+  })
+
+  observeEvent(input$btn_use_live, {
+    tryCatch(
+      {
+        reload_live_state(NULL)
+        rv$archive_load_msg <- "Back on live workspace (data/, cropped/, output/)."
+        showNotification(rv$archive_load_msg, type = "message")
+      },
+      error = function(e) {
+        rv$archive_load_msg <- conditionMessage(e)
+        showNotification(rv$archive_load_msg, type = "error", duration = NULL)
+      }
+    )
+  })
+
   observeEvent(input$btn_restore_archive, {
     nm <- input$archive_pick
     if (is.null(nm) || !nzchar(nm)) {
-      showNotification("Pick an archive to load.", type = "error")
+      showNotification("Pick an archive to restore.", type = "error")
       return(invisible(NULL))
     }
     showModal(modalDialog(
-      title = paste0("Load archive “", nm, "”?"),
+      title = paste0("Restore “", nm, "” into live workspace?"),
       easyClose = TRUE,
       footer = tagList(
         modalButton("Cancel"),
         actionButton("btn_restore_archive_ok", "Yes, replace live data", class = "btn-warning")
       ),
-      tags$p("This overwrites the current ", tags$code("data/"), " files with the archive."),
-      tags$p("Photos already in ", tags$code("images/"), " stay put. Missing demos will be handled as selected.")
+      tags$p("Copies this archive into live ", tags$code("data/"),
+             " (and optionally cropped/output). Current live project is overwritten."),
+      tags$p("Photos in ", tags$code("images/"), " stay put.")
     ))
   })
 
   observeEvent(input$btn_restore_archive_ok, {
     removeModal()
     nm <- input$archive_pick
-    withProgress(message = "Loading archive…", value = 0.3, {
+    withProgress(message = "Restoring archive…", value = 0.3, {
       tryCatch(
         {
           res <- restore_archive(
             name = nm,
             root = app_root,
             restore_cropped = isTRUE(input$archive_restore_cropped),
+            restore_output = isTRUE(input$archive_restore_output),
             missing_demos = input$archive_missing_demos
           )
           setProgress(0.8)
-          reload_live_state()
-          extra <- if (length(res$demos_made) > 0) {
-            paste0(" Regenerated ", length(res$demos_made), " demo(s).")
-          } else {
-            ""
-          }
-          rv$archive_load_msg <- paste0("Loaded archive “", res$name, "”.", extra)
+          reload_live_state(NULL)
+          rv$archive_load_msg <- paste0(
+            "Restored “", res$name, "” into live workspace.",
+            if (length(res$demos_made) > 0) paste0(" Regenerated ", length(res$demos_made), " demo(s).") else ""
+          )
           showNotification(rv$archive_load_msg, type = "message")
           updateTabsetPanel(session, "tabs", selected = "Poster")
         },
@@ -1464,6 +1711,45 @@ server <- function(input, output, session) {
         }
       )
     })
+  })
+
+  observeEvent(input$btn_delete_archive, {
+    nm <- input$archive_pick
+    if (is.null(nm) || !nzchar(nm)) {
+      showNotification("Pick an archive to delete.", type = "error")
+      return(invisible(NULL))
+    }
+    showModal(modalDialog(
+      title = paste0("Delete archive “", nm, "”?"),
+      easyClose = TRUE,
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("btn_delete_archive_ok", "Yes, delete permanently", class = "btn-danger")
+      ),
+      tags$p("Removes ", tags$code(paste0("archive/", nm, "/")), " including its data, crops, and output."),
+      tags$p("Does not delete photos under ", tags$code("images/"), ".")
+    ))
+  })
+
+  observeEvent(input$btn_delete_archive_ok, {
+    removeModal()
+    nm <- input$archive_pick
+    tryCatch(
+      {
+        if (isTRUE(rv$layout$is_archive) && identical(rv$layout$archive_name, sanitize_archive_name(nm))) {
+          reload_live_state(NULL)
+        }
+        delete_archive(nm, root = app_root)
+        rv$archive_nonce <- rv$archive_nonce + 1L
+        refresh_archive_choices()
+        rv$archive_load_msg <- paste0("Deleted archive/", nm, "/")
+        showNotification(rv$archive_load_msg, type = "message")
+      },
+      error = function(e) {
+        rv$archive_load_msg <- conditionMessage(e)
+        showNotification(rv$archive_load_msg, type = "error", duration = NULL)
+      }
+    )
   })
 }
 
